@@ -510,8 +510,6 @@ namespace spades {
 		void FTFont::Draw(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
 
-			auto lines = SplitIntoLines(str);
-
 			float x = 0.0F;
 			float y = 0.0F;
 
@@ -553,8 +551,6 @@ namespace spades {
 
 		void FTFont::DrawBlurred(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
-
-			auto lines = SplitIntoLines(str);
 
 			float x = 0.0F;
 			float y = 0.0F;
