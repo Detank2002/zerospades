@@ -33,8 +33,8 @@
 DEFINE_SPADES_SETTING(cg_chatHeight, "30");
 DEFINE_SPADES_SETTING(cg_killfeedHeight, "26");
 
-DEFINE_SPADES_SETTING(cg_chatFadeTime, "10");
-DEFINE_SPADES_SETTING(cg_killfeedFadeTime, "20");
+DEFINE_SPADES_SETTING(cg_chatFadeTime, "12");
+DEFINE_SPADES_SETTING(cg_killfeedFadeTime, "6");
 
 SPADES_SETTING(cg_stats);
 SPADES_SETTING(cg_statsSmallFont);
