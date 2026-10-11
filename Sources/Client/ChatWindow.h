@@ -66,8 +66,7 @@ namespace spades {
 			bool killfeed;
 
 			float GetWidth();
-			float GetNormalHeight();
-			float GetBufferHeight();
+			float GetHeight();
 			float GetLineHeight();
 
 			std::vector<IImage*> killImages;

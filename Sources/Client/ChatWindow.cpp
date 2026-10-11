@@ -64,15 +64,9 @@ namespace spades {
 
 		float ChatWindow::GetWidth() { return renderer.ScreenWidth() * 0.5F; }
 
-		float ChatWindow::GetNormalHeight() {
+		float ChatWindow::GetHeight() {
 			float prop = killfeed ? (float)cg_killfeedHeight : (float)cg_chatHeight;
-
 			return renderer.ScreenHeight() * prop * 0.01F;
-		}
-
-		float ChatWindow::GetBufferHeight() {
-			// Nothing is kept past the visible area: the chat history lives in the chat panel.
-			return GetNormalHeight();
 		}
 
 		float ChatWindow::GetLineHeight() { return 20.0F; }
@@ -169,57 +163,33 @@ namespace spades {
 					firstY = 0.0F;
 			}
 
-			float normalHeight = GetNormalHeight();
-			float bufferHeight = GetBufferHeight();
-
-			// The killfeed grows downwards from the top (newest first).
-			// The chat grows upwards from the bottom edge (newest at the bottom),
-			// like the TextViewer based chats.
-			float y = killfeed ? firstY : normalHeight - firstY;
+			float height = GetHeight();
+			float y = firstY;
 
 			for (auto it = entries.begin(); it != entries.end();) {
 				ChatEntry& ent = *it;
 
-				float top = killfeed ? y : y - ent.height;
-				float bottom = top + ent.height;
-
-				bool pastBuffer;  // outside the area where entries are kept
-				bool pastNormal;  // outside the visible area, fading out
-				bool onScreen;    // reached the visible area (slide-in finished or in progress)
-				if (killfeed) {
-					pastBuffer = bottom > bufferHeight;
-					pastNormal = bottom > normalHeight;
-					onScreen = bottom > 0.0F;
-				} else {
-					pastBuffer = top < normalHeight - bufferHeight;
-					pastNormal = top < 0.0F;
-					onScreen = top < normalHeight;
-				}
-
-				if (pastBuffer) {
-					ent.bufferFade -= dt * 4.0F;
-					if (ent.bufferFade < 0.0F) {
-						// evict from the buffer
-						std::list<ChatEntry>::iterator tmp = it++;
-						entries.erase(tmp);
+				// Stacking direction doesn't matter here: the chat is the mirror
+				// image of the killfeed, so the same conditions apply to both.
+				if (y + ent.height > height) {
+					// fade out, then remove
+					ent.fade -= dt * 4.0F;
+					if (ent.fade < 0.0F) {
+						it = entries.erase(it);
 						continue;
 					}
-				}
-
-				if (pastNormal) {
-					ent.fade = std::max(ent.fade - dt * 4.0F, 0.0F);
-				} else if (onScreen) {
+				} else if (y + ent.height > 0.0F) {
+					// fade in
 					ent.fade = std::min(ent.fade + dt * 4.0F, 1.0F);
-					ent.bufferFade = std::min(ent.bufferFade + dt * 4.0F, 1.0F);
 				}
 
-				if (ent.timeFade > 0.0F) {
-					ent.timeFade -= dt;
-					if (ent.timeFade < 0.0F)
-						ent.timeFade = 0.0F;
+				ent.timeFade -= dt;
+				if (ent.timeFade < 0.0F) {
+					it = entries.erase(it);
+					continue;
 				}
 
-				y = killfeed ? bottom : top;
+				y += ent.height;
 				++it;
 			}
 		}
@@ -229,7 +199,7 @@ namespace spades {
 
 			float sh = renderer.ScreenHeight();
 
-			float winH = GetNormalHeight();
+			float winH = GetHeight();
 			float winX = 8.0F;
 			float winY = killfeed ? 8.0F : (sh - 64.0F) - winH;
 			float lh = GetLineHeight();
