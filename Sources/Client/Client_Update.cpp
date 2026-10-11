@@ -72,6 +72,8 @@ SPADES_SETTING(cg_holdAimDownSight);
 SPADES_SETTING(cg_damageIndicators);
 SPADES_SETTING(cg_corpseDisableGravity);
 
+SPADES_SETTING(cg_killfeedFadeTime);
+
 namespace spades {
 	namespace client {
 
@@ -1178,8 +1180,10 @@ namespace spades {
 			const int victimId = victim.GetId();
 			const int killerId = killer.GetId();
 
+			const bool isLocalInvolved = killer.IsLocalPlayer() || victim.IsLocalPlayer();
+
 			bool isRevengeKill = false;
-			if (killerId != victimId && (killer.IsLocalPlayer() || victim.IsLocalPlayer())) {
+			if (killerId != victimId && isLocalInvolved) {
 				// check if the victim was dominating before dying
 				if (killStreaks[victimId][killerId] >= 4) {
 					killStreaks[killerId][victimId] = 1; // start new streak for the killer
@@ -1310,7 +1314,7 @@ namespace spades {
 				s += "[";
 				if (killerId != victimId && killer.IsTeammate(victim))
 					s += ChatWindow::ColoredMessage(cause, MsgColorFriendlyFire);
-				else if (killer.IsLocalPlayer() || victim.IsLocalPlayer())
+				else if (isLocalInvolved)
 					s += ChatWindow::ColoredMessage(cause, MsgColorGray);
 				else
 					s += cause;
@@ -1323,7 +1327,7 @@ namespace spades {
 				s += ChatWindow::TeamColorMessage(victim.GetName(), victim.GetTeamId());
 
 				// add domination indicator
-				if (cg_killfeedStreaks && (killer.IsLocalPlayer() || victim.IsLocalPlayer())) {
+				if (cg_killfeedStreaks && isLocalInvolved) {
 					const int killerStreak = killStreaks[killerId][victimId];
 					if (isRevengeKill || killerStreak >= 2) {
 						s += " ";
@@ -1350,7 +1354,12 @@ namespace spades {
 				}
 			}
 
-			killfeedWindow->AddMessage(s);
+			// add extra time for local events
+			float killFadeTime = cg_killfeedFadeTime;
+			if (isLocalInvolved)
+				killFadeTime += 5.0F;
+
+			killfeedWindow->AddMessage(s, killFadeTime);
 
 			// log to netlog
 			if (killerId != victimId) {
@@ -1363,7 +1372,7 @@ namespace spades {
 			}
 
 			// show big message if local player is involved
-			if (killerId != victimId && (killer.IsLocalPlayer() || victim.IsLocalPlayer())) {
+			if (killerId != victimId && isLocalInvolved) {
 				std::string msg = "";
 				if (victim.IsLocalPlayer()) {
 					msg = _Tr("Client", "You were killed by {0}", killer.GetName());

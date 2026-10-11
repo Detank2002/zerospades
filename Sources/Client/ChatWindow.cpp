@@ -108,12 +108,14 @@ namespace spades {
 			return NULL;
 		}
 
-		void ChatWindow::AddMessage(const std::string& msg) {
+		void ChatWindow::AddMessage(const std::string& msg, float fadeTime) {
 			SPADES_MARK_FUNCTION();
 
 			float lh = GetLineHeight();
 			float fadeOut = killfeed ? 0.5F : 1.0F;
-			float fadeTime = killfeed ? cg_killfeedFadeTime : cg_chatFadeTime;
+
+			if (fadeTime < 0.0F)
+				fadeTime = killfeed ? cg_killfeedFadeTime : cg_chatFadeTime;
 
 			entries.push_front(ChatEntry(msg, lh, fadeTime + fadeOut));
 
@@ -185,8 +187,13 @@ namespace spades {
 
 				ent.timeFade -= dt;
 				if (ent.timeFade < 0.0F) {
-					it = entries.erase(it);
-					continue;
+					// Collapse the expired line so the others slide into its place,
+					// then remove it once it has no height left.
+					ent.height = std::max(ent.height - dt * 100.0F, 0.0F);
+					if (ent.height <= 0.0F) {
+						it = entries.erase(it);
+						continue;
+					}
 				}
 
 				y += ent.height;

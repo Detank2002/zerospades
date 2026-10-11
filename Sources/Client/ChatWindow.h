@@ -76,7 +76,7 @@ namespace spades {
 			ChatWindow(Client*, IFont* font, bool killfeed);
 			~ChatWindow();
 
-			void AddMessage(const std::string&);
+			void AddMessage(const std::string&, float fadeTime = -1.0F);
 			static std::string ColoredMessage(const std::string&, char);
 			static std::string TeamColorMessage(const std::string&, int);
 			static std::string KillImage(int killType, int weaponType = -1);
