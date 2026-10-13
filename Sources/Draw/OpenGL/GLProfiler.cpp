@@ -48,9 +48,10 @@ namespace spades {
 
 			void ResetTimes() { startTimePoint = chrono::high_resolution_clock::now(); }
 
+			/** The time since `ResetTimes`, in seconds. */
 			double GetWallClockTime() {
 				auto duration = chrono::high_resolution_clock::now() - startTimePoint;
-				return chrono::duration_cast<chrono::milliseconds>(duration).count() / 1000000.0;
+				return chrono::duration<double>(duration).count();
 			}
 		} // namespace
 
