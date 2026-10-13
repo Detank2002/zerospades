@@ -42,6 +42,10 @@ namespace spades {
 				float angle;
 				Vector4 color;
 				float area;
+				// Lit by the daylight and the dynamic lights (`dlR` and so on, see
+				// `EvaluateSpriteDynamicLights`) rather than emitting its own
+				bool scattering;
+				Vector4 dlR, dlG, dlB;
 			};
 
 			struct Vertex {
@@ -55,6 +59,10 @@ namespace spades {
 
 				// color
 				float r, g, b, a;
+
+				// the light: see `Sprite`
+				float dlR[4], dlG[4], dlB[4];
+				float scattering;
 			};
 
 			GLRenderer &renderer;
@@ -83,6 +91,11 @@ namespace spades {
 			GLProgramAttribute positionAttribute;
 			GLProgramAttribute spritePosAttribute;
 			GLProgramAttribute colorAttribute;
+			GLProgramAttribute dlRAttribute;
+			GLProgramAttribute dlGAttribute;
+			GLProgramAttribute dlBAttribute;
+			GLProgramAttribute scatteringAttribute;
+			GLProgramUniform daylight;
 
 			float thresLow, thresRange;
 

@@ -27,12 +27,22 @@
 #include "GLProgram.h"
 #include "GLQuadRenderer.h"
 #include "GLRenderer.h"
+#include "GLSpriteLight.h"
 #include "IGLDevice.h"
 #include "../SW/SWFeatureLevel.h" // for fastRcp
 #include <Core/Debug.h>
 
 namespace spades {
 	namespace draw {
+		namespace {
+			void Store4(float (&out)[4], const Vector4 &v) {
+				out[0] = v.x;
+				out[1] = v.y;
+				out[2] = v.z;
+				out[3] = v.w;
+			}
+		} // namespace
+
 
 		GLSoftSpriteRenderer::GLSoftSpriteRenderer(GLRenderer &renderer)
 		    : renderer(renderer),
@@ -51,7 +61,12 @@ namespace spades {
 		      zNearFar("zNearFar"),
 		      positionAttribute("positionAttribute"),
 		      spritePosAttribute("spritePosAttribute"),
-		      colorAttribute("colorAttribute") {
+		      colorAttribute("colorAttribute"),
+		      dlRAttribute("dlRAttribute"),
+		      dlGAttribute("dlGAttribute"),
+		      dlBAttribute("dlBAttribute"),
+		      scatteringAttribute("scatteringAttribute"),
+		      daylight("daylight") {
 			SPADES_MARK_FUNCTION();
 
 			program = renderer.RegisterProgram("Shaders/OpenGL/SoftSprite.program");
@@ -84,16 +99,9 @@ namespace spades {
 					color.z *= color.z * rcp;
 				}
 			}
-			if (!emissive) {
-				// These sprites are not lit, so a scattering one would glow in the dark:
-				// the daylight dims it as it dims the world, in linear light (hence the
-				// root for a gamma-encoded colour).
-				const float daylight = renderer.GetDaylight();
-				const float scale = settings.r_hdr ? daylight : std::sqrt(daylight);
-				color.x *= scale;
-				color.y *= scale;
-				color.z *= scale;
-			}
+			// A scattering one is lit at its corners by the daylight, which dims it as
+			// it dims the world, and the dynamic lights (Sprite.vs)
+			spr.scattering = !emissive;
 			spr.color = color;
 			spr.area = rad * rad * 4.0F / std::max(Vector3::Dot(center - def.viewOrigin, def.viewAxis[2]), 0.01F);
 			sprites.push_back(spr);
@@ -116,6 +124,13 @@ namespace spades {
 		void GLSoftSpriteRenderer::Render() {
 			SPADES_MARK_FUNCTION();
 			lastImage = NULL;
+
+			// The dynamic lights on each scattering sprite, for its corners to be lit by
+			for (Sprite &spr : sprites)
+				if (spr.scattering)
+					EvaluateSpriteDynamicLights(renderer.lights, spr.center, spr.radius,
+					                            spr.dlR, spr.dlG, spr.dlB);
+
 			program->Use();
 
 			device.Enable(IGLDevice::Blend, true);
@@ -136,6 +151,11 @@ namespace spades {
 			positionAttribute(program);
 			spritePosAttribute(program);
 			colorAttribute(program);
+			dlRAttribute(program);
+			dlGAttribute(program);
+			dlBAttribute(program);
+			scatteringAttribute(program);
+			daylight(program);
 
 			projectionViewMatrix.SetValue(renderer.GetProjectionViewMatrix());
 			viewMatrix.SetValue(renderer.GetViewMatrix());
@@ -153,6 +173,7 @@ namespace spades {
 
 			viewOriginVector.SetValue(def.viewOrigin.x, def.viewOrigin.y, def.viewOrigin.z);
 			texture.SetValue(0);
+			daylight.SetValue(renderer.GetDaylight());
 			depthTexture.SetValue(1);
 			zNearFar.SetValue(def.zNear, def.zFar);
 
@@ -164,6 +185,10 @@ namespace spades {
 			device.EnableVertexAttribArray(positionAttribute(), true);
 			device.EnableVertexAttribArray(spritePosAttribute(), true);
 			device.EnableVertexAttribArray(colorAttribute(), true);
+			device.EnableVertexAttribArray(dlRAttribute(), true);
+			device.EnableVertexAttribArray(dlGAttribute(), true);
+			device.EnableVertexAttribArray(dlBAttribute(), true);
+			device.EnableVertexAttribArray(scatteringAttribute(), true);
 
 			thresLow = tanf(def.fovX * .5f) * tanf(def.fovY * .5f) * 1.8f;
 			thresRange = thresLow * .5f;
@@ -192,6 +217,10 @@ namespace spades {
 					v.g = spr.color.y;
 					v.b = spr.color.z;
 					v.a = spr.color.w;
+					Store4(v.dlR, spr.dlR);
+					Store4(v.dlG, spr.dlG);
+					Store4(v.dlB, spr.dlB);
+					v.scattering = spr.scattering ? 1.0F : 0.0F;
 
 					float fade = 1.f - layer;
 					v.r *= fade;
@@ -260,6 +289,10 @@ namespace spades {
 					v.g = spr.color.y;
 					v.b = spr.color.z;
 					v.a = spr.color.w;
+					Store4(v.dlR, spr.dlR);
+					Store4(v.dlG, spr.dlG);
+					Store4(v.dlB, spr.dlB);
+					v.scattering = spr.scattering ? 1.0F : 0.0F;
 
 					float fade = layer;
 					v.r *= fade;
@@ -300,6 +333,10 @@ namespace spades {
 			device.EnableVertexAttribArray(positionAttribute(), false);
 			device.EnableVertexAttribArray(spritePosAttribute(), false);
 			device.EnableVertexAttribArray(colorAttribute(), false);
+			device.EnableVertexAttribArray(dlRAttribute(), false);
+			device.EnableVertexAttribArray(dlGAttribute(), false);
+			device.EnableVertexAttribArray(dlBAttribute(), false);
+			device.EnableVertexAttribArray(scatteringAttribute(), false);
 
 			// composite downsampled sprite
 			device.BlendFunc(IGLDevice::One, IGLDevice::OneMinusSrcAlpha);
@@ -390,6 +427,14 @@ namespace spades {
 			                           sizeof(Vertex), &(vertices[0].sx));
 			device.VertexAttribPointer(colorAttribute(), 4, IGLDevice::FloatType, false,
 			                           sizeof(Vertex), &(vertices[0].r));
+			device.VertexAttribPointer(dlRAttribute(), 4, IGLDevice::FloatType, false,
+			                           sizeof(Vertex), vertices[0].dlR);
+			device.VertexAttribPointer(dlGAttribute(), 4, IGLDevice::FloatType, false,
+			                           sizeof(Vertex), vertices[0].dlG);
+			device.VertexAttribPointer(dlBAttribute(), 4, IGLDevice::FloatType, false,
+			                           sizeof(Vertex), vertices[0].dlB);
+			device.VertexAttribPointer(scatteringAttribute(), 1, IGLDevice::FloatType, false,
+			                           sizeof(Vertex), &(vertices[0].scattering));
 
 			SPAssert(lastImage);
 			lastImage->Bind(IGLDevice::Texture2D);

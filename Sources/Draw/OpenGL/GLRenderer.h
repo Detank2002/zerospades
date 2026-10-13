@@ -67,6 +67,8 @@ namespace spades {
 			friend class IGLShadowMapRenderer;
 			friend class GLRadiosityRenderer;
 			friend class GLSoftLitSpriteRenderer;
+			friend class GLSoftSpriteRenderer;
+			friend class GLSpriteRenderer;
 
 			struct DebugLine {
 				Vector3 v1, v2;

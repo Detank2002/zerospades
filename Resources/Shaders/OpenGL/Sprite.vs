@@ -23,6 +23,13 @@ uniform mat4 viewMatrix;
 uniform vec3 rightVector;
 uniform vec3 upVector;
 uniform vec3 viewOriginVector;
+uniform vec3 frontVector;
+uniform float daylight;
+
+attribute vec4 dlRAttribute;
+attribute vec4 dlGAttribute;
+attribute vec4 dlBAttribute;
+attribute float scatteringAttribute;
 
 attribute vec4 positionAttribute;
 attribute vec3 spritePosAttribute;
@@ -35,7 +42,8 @@ varying vec4 fogDensity;
 vec4 ComputeFogDensity(float poweredLength);
 
 void main() {
-	vec3 pos = positionAttribute.xyz;
+	vec3 center = positionAttribute.xyz;
+	vec3 pos = center;
 	float radius = positionAttribute.w;
 
 	vec3 right = rightVector * radius;
@@ -50,9 +58,26 @@ void main() {
 	pos += right * sprP.x;
 	pos += up * sprP.y;
 
+	// A scattering sprite is lit at its corners, as the Vulkan renderer's are
+	// (SpriteLight.glsl): by the daylight, which dims it as it dims the world, and
+	// the dynamic lights through the volume it stands for, at the normal of its
+	// bulge leaning towards the eye
+	vec3 light = vec3(1.0);
+	if (scatteringAttribute > 0.5) {
+		vec4 normal = vec4(normalize((pos - center) - frontVector), 1.0);
+		light = vec3(daylight) + vec3(dot(normal, dlRAttribute), dot(normal, dlGAttribute),
+		                              dot(normal, dlBAttribute));
+		light = max(light, vec3(0.0));
+#if !LINEAR_FRAMEBUFFER
+		// for the gamma-encoded colour
+		light = sqrt(light);
+#endif
+	}
+
 	gl_Position = projectionViewMatrix * vec4(pos, 1.0);
 
 	color = colorAttribute;
+	color.xyz *= light;
 	
 	// sprite texture coord
 	texCoord = spritePosAttribute.xy * 0.5 + 0.5;

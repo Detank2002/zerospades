@@ -27,6 +27,7 @@
 #include "GLQuadRenderer.h"
 #include "GLRenderer.h"
 #include "GLShadowShader.h"
+#include "GLSpriteLight.h"
 #include "IGLDevice.h"
 #include "../SW/SWFeatureLevel.h" // for fastRcp
 #include <Core/Debug.h>
@@ -129,73 +130,8 @@ namespace spades {
 					spr.emission = MakeVector3(0.f, 0.f, 0.f);
 				}
 
-				spr.dlR = MakeVector4(0, 0, 0, 0);
-				spr.dlG = MakeVector4(0, 0, 0, 0);
-				spr.dlB = MakeVector4(0, 0, 0, 0);
-			}
-
-			for (size_t j = 0; j < lights.size(); j++) {
-				const GLDynamicLight& l = lights[j];
-				const client::DynamicLightParam& dl = l.GetParam();
-				float spotTan =
-				  dl.type == client::DynamicLightTypeSpotlight ? tanf(dl.spotAngle * 0.5F) : 0.0F;
-				for (size_t i = 0; i < sprites.size(); i++) {
-					Sprite& spr = sprites[i];
-
-					Vector3 v = dl.origin - spr.center;
-					float effectiveRadius = spr.radius + dl.radius;
-
-					if (v.GetChebyshevLength() > effectiveRadius)
-						continue;
-					float distSqr = v.GetSquaredLength();
-					if (distSqr > effectiveRadius * effectiveRadius)
-						continue;
-					float att = 1.0F - distSqr / (effectiveRadius * effectiveRadius);
-					float unif;
-					unif = 1.0F - distSqr / (spr.radius * spr.radius);
-					unif = std::max(0.2F, unif);
-
-					if (dl.type == client::DynamicLightTypeSpotlight) {
-						float forward = Vector3::Dot(v, dl.spotAxis[2]);
-						if (forward > spr.radius) {
-							continue;
-						} else if (forward >= -spr.radius) {
-							att *= 0.5F - (forward / spr.radius) * 0.5F;
-						} else {
-							float cx = Vector3::Dot(spr.center - dl.origin, dl.spotAxis[0]);
-							float cy = Vector3::Dot(spr.center - dl.origin, dl.spotAxis[1]);
-							float sq = sqrtf(cx * cx + cy * cy);
-							float sprTan = spr.radius / (-spr.radius - forward);
-							float eff = sprTan + spotTan;
-							sq /= -forward;
-							if (sq > eff)
-								continue;
-							if (sq > eff - spotTan)
-								att *= (eff - sq) / spotTan;
-						}
-					}
-
-					Vector4 final;
-
-					if (unif < .9999f) {
-						float directionalScale = (1.f - unif) / sqrtf(distSqr);
-						Vector4 directional = {v.x * directionalScale, v.y * directionalScale,
-						                       v.z * directionalScale, unif};
-						directional *= att;
-						final = directional;
-					} else {
-						final.x = 0.0F;
-						final.y = 0.0F;
-						final.z = 0.0F;
-						final.w = 0.0F;
-					}
-
-					final.w += unif * att;
-
-					spr.dlR += final * dl.color.x;
-					spr.dlG += final * dl.color.y;
-					spr.dlB += final * dl.color.z;
-				}
+				EvaluateSpriteDynamicLights(lights, spr.center, spr.radius, spr.dlR, spr.dlG,
+				                            spr.dlB);
 			}
 
 			lastImage = NULL;
