@@ -21,6 +21,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include <cstdint>
 #include <vector>
 
@@ -53,13 +54,19 @@ namespace spades {
 				VoxelType dataX[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataY[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataZ[ChunkSize][ChunkSize][ChunkSize];
+				// What map edits left to recompute: written by the render thread,
+				// taken by the worker, both under `dirtyMutex`
 				bool dirty = true;
 				int dirtyMinX = 0, dirtyMaxX = ChunkSize - 1;
 				int dirtyMinY = 0, dirtyMaxY = ChunkSize - 1;
 				int dirtyMinZ = 0, dirtyMaxZ = ChunkSize - 1;
 
+				// Who owns the data: the worker while true, which then computes
+				// into it and hands it over by clearing this; the render thread
+				// while false, which uploads it and only then hands it back
 				std::atomic<bool> transferDone{true};
 			};
+			std::mutex dirtyMutex;
 
 			IGLDevice::UInteger textureFlat;
 			IGLDevice::UInteger textureX;
@@ -89,7 +96,9 @@ namespace spades {
 			void Invalidate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
 
 			void UpdateChunk(int cx, int cy, int cz);
-			void UpdateDirtyChunks();
+			/** On the worker: recomputes a batch of dirty chunks, those around
+			 * `eyeChunk` first */
+			void UpdateDirtyChunks(IntVector3 eyeChunk);
 			int GetNumDirtyChunks();
 
 			uint32_t EncodeValue(Vector3 vec);

@@ -42,14 +42,17 @@ namespace spades {
 	namespace draw {
 		class GLRadiosityRenderer::UpdateDispatch : public ConcurrentDispatch {
 			GLRadiosityRenderer& renderer;
+			// Where the eye was when the dispatch began, taken on the render
+			// thread: the scene's definition is not the worker's to read
+			const IntVector3 eyeChunk;
 
 		public:
 			std::atomic<bool> done{false};
-			UpdateDispatch(GLRadiosityRenderer& r) : renderer(r) {}
+			UpdateDispatch(GLRadiosityRenderer& r, IntVector3 eye) : renderer(r), eyeChunk(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
 
-				renderer.UpdateDirtyChunks();
+				renderer.UpdateDirtyChunks(eyeChunk);
 
 				done = true;
 			}
@@ -280,6 +283,8 @@ namespace spades {
 			if (minX > maxX || minY > maxY || minZ > maxZ)
 				return;
 
+			std::lock_guard<std::mutex> lock(dirtyMutex);
+
 			// these should be floor div
 			int cx1 = minX >> ChunkSizeBits;
 			int cy1 = minY >> ChunkSizeBits;
@@ -323,6 +328,7 @@ namespace spades {
 		}
 
 		int GLRadiosityRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			int cnt = 0;
 			for (const auto& c : chunks) {
 				if (c.dirty)
@@ -337,7 +343,10 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				const Vector3& eye = renderer.GetSceneDef().viewOrigin;
+				dispatch = new UpdateDispatch(
+				  *this, IntVector3{(int)eye.x >> ChunkSizeBits, (int)eye.y >> ChunkSizeBits,
+				                    (int)eye.z >> ChunkSizeBits});
 				dispatch->Start();
 			}
 
@@ -350,7 +359,7 @@ namespace spades {
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Radiosity [>= %d chunk(s)]", cnt);
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
-				if (!c.transferDone.exchange(true)) {
+				if (!c.transferDone.load(std::memory_order_acquire)) {
 					device.BindTexture(IGLDevice::Texture3D, textureFlat);
 					device.TexSubImage3D(IGLDevice::Texture3D, 0, c.cx * ChunkSize,
 					                     c.cy * ChunkSize, c.cz * ChunkSize, ChunkSize, ChunkSize,
@@ -374,19 +383,28 @@ namespace spades {
 					                     c.cy * ChunkSize, c.cz * ChunkSize, ChunkSize, ChunkSize,
 					                     ChunkSize, IGLDevice::BGRA,
 					                     IGLDevice::UnsignedInt2101010Rev, c.dataZ);
+					// Copied out: the data is the worker's again
+					c.transferDone.store(true, std::memory_order_release);
 				}
 			}
 		}
 
-		void GLRadiosityRenderer::UpdateDirtyChunks() {
+		void GLRadiosityRenderer::UpdateDirtyChunks(IntVector3 eyeChunk) {
 			int dirtyChunkIds[256];
 			int numDirtyChunks = 0;
 
+			// Only chunks whose data is the worker's: one still waiting to be
+			// uploaded stays dirty for a later batch
+			auto available = [](const Chunk& c) {
+				return c.dirty && c.transferDone.load(std::memory_order_acquire);
+			};
+
+			std::unique_lock<std::mutex> lock(dirtyMutex);
+
 			// first, check only chunks in near range
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			int eyeX = eyeChunk.x;
+			int eyeY = eyeChunk.y;
+			int eyeZ = eyeChunk.z;
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -399,7 +417,7 @@ namespace spades {
 					continue;
 				if (dz >= 6 || dz <= -6)
 					continue;
-				if (c.dirty) {
+				if (available(c)) {
 					dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 					if (numDirtyChunks >= 256)
 						break;
@@ -410,13 +428,15 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (available(c)) {
 						dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 						if (numDirtyChunks >= 256)
 							break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			// limit update count per frame
 			for (int i = 0; i < 8; i++) {
@@ -498,16 +518,29 @@ namespace spades {
 
 		void GLRadiosityRenderer::UpdateChunk(int cx, int cy, int cz) {
 			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
-				return;
+			// Take what is dirty; an edit landing during the work below marks it
+			// dirty again, for a later batch
+			int dirtyMinX, dirtyMinY, dirtyMinZ, dirtyMaxX, dirtyMaxY, dirtyMaxZ;
+			{
+				std::lock_guard<std::mutex> lock(dirtyMutex);
+				if (!c.dirty)
+					return;
+				dirtyMinX = c.dirtyMinX;
+				dirtyMaxX = c.dirtyMaxX;
+				dirtyMinY = c.dirtyMinY;
+				dirtyMaxY = c.dirtyMaxY;
+				dirtyMinZ = c.dirtyMinZ;
+				dirtyMaxZ = c.dirtyMaxZ;
+				c.dirty = false;
+			}
 
 			int originX = cx * ChunkSize;
 			int originY = cy * ChunkSize;
 			int originZ = cz * ChunkSize;
 
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-			for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-			for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = dirtyMinZ; z <= dirtyMaxZ; z++)
+			for (int y = dirtyMinY; y <= dirtyMaxY; y++)
+			for (int x = dirtyMinX; x <= dirtyMaxX; x++) {
 				IntVector3 pos;
 				pos.x = (x + originX);
 				pos.y = (y + originY);
@@ -520,8 +553,8 @@ namespace spades {
 				c.dataZ[z][y][x] = EncodeValue(res.z);
 			}
 
-			c.dirty = false;
-			c.transferDone = false;
+			// Hand the data over for upload
+			c.transferDone.store(false, std::memory_order_release);
 		}
 	} // namespace draw
 } // namespace spades

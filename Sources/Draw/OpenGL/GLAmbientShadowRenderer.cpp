@@ -32,14 +32,17 @@ namespace spades {
 	namespace draw {
 		class GLAmbientShadowRenderer::UpdateDispatch : public ConcurrentDispatch {
 			GLAmbientShadowRenderer& renderer;
+			// Where the eye was when the dispatch began, taken on the render
+			// thread: the scene's definition is not the worker's to read
+			const IntVector3 eyeChunk;
 
 		public:
 			std::atomic<bool> done{false};
-			UpdateDispatch(GLAmbientShadowRenderer& r) : renderer(r) {}
+			UpdateDispatch(GLAmbientShadowRenderer& r, IntVector3 eye) : renderer(r), eyeChunk(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
 
-				renderer.UpdateDirtyChunks();
+				renderer.UpdateDirtyChunks(eyeChunk);
 
 				done = true;
 			}
@@ -172,6 +175,8 @@ namespace spades {
 			if (minX > maxX || minY > maxY || minZ > maxZ)
 				return;
 
+			std::lock_guard<std::mutex> lock(dirtyMutex);
+
 			// these should be floor div
 			int cx1 = minX >> ChunkSizeBits;
 			int cy1 = minY >> ChunkSizeBits;
@@ -217,6 +222,7 @@ namespace spades {
 		}
 
 		int GLAmbientShadowRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			return (int)std::count_if(chunks.begin(), chunks.end(),
 			                          [](const Chunk& c) { return c.dirty; });
 		}
@@ -227,7 +233,10 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				const Vector3& eye = renderer.GetSceneDef().viewOrigin;
+				dispatch = new UpdateDispatch(
+				  *this, IntVector3{(int)eye.x >> ChunkSizeBits, (int)eye.y >> ChunkSizeBits,
+				                    (int)eye.z >> ChunkSizeBits});
 				dispatch->Start();
 			}
 
@@ -241,24 +250,33 @@ namespace spades {
 
 			device.BindTexture(IGLDevice::Texture3D, texture);
 			for (Chunk& c : chunks) {
-				if (!c.transferDone.exchange(true)) {
+				if (!c.transferDone.load(std::memory_order_acquire)) {
 					device.TexSubImage3D(IGLDevice::Texture3D, 0, c.cx * ChunkSize,
 					                     c.cy * ChunkSize, c.cz * ChunkSize + 1, ChunkSize,
 					                     ChunkSize, ChunkSize, IGLDevice::RG, IGLDevice::FloatType,
 					                     c.data);
+					// Copied out: the data is the worker's again
+					c.transferDone.store(true, std::memory_order_release);
 				}
 			}
 		}
 
-		void GLAmbientShadowRenderer::UpdateDirtyChunks() {
+		void GLAmbientShadowRenderer::UpdateDirtyChunks(IntVector3 eyeChunk) {
 			std::array<std::size_t, 256> dirtyChunkIds;
 			std::size_t numDirtyChunks = 0;
 
+			// Only chunks whose data is the worker's: one still waiting to be
+			// uploaded stays dirty for a later batch
+			auto available = [](const Chunk& c) {
+				return c.dirty && c.transferDone.load(std::memory_order_acquire);
+			};
+
+			std::unique_lock<std::mutex> lock(dirtyMutex);
+
 			// first, check only chunks in near range
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			int eyeX = eyeChunk.x;
+			int eyeY = eyeChunk.y;
+			int eyeZ = eyeChunk.z;
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -271,7 +289,7 @@ namespace spades {
 					continue;
 				if (dz >= 6 || dz <= -6)
 					continue;
-				if (c.dirty) {
+				if (available(c)) {
 					dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 					if (numDirtyChunks >= dirtyChunkIds.size())
 						break;
@@ -282,13 +300,15 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (available(c)) {
 						dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 						if (numDirtyChunks >= dirtyChunkIds.size())
 							break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			// limit update count per frame
 			for (int i = 0; i < 8; i++) {
@@ -308,8 +328,21 @@ namespace spades {
 
 		void GLAmbientShadowRenderer::UpdateChunk(int cx, int cy, int cz) {
 			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
-				return;
+			// Take what is dirty; an edit landing during the work below marks it
+			// dirty again, for a later batch
+			int dirtyMinX, dirtyMinY, dirtyMinZ, dirtyMaxX, dirtyMaxY, dirtyMaxZ;
+			{
+				std::lock_guard<std::mutex> lock(dirtyMutex);
+				if (!c.dirty)
+					return;
+				dirtyMinX = c.dirtyMinX;
+				dirtyMaxX = c.dirtyMaxX;
+				dirtyMinY = c.dirtyMinY;
+				dirtyMaxY = c.dirtyMaxY;
+				dirtyMinZ = c.dirtyMinZ;
+				dirtyMaxZ = c.dirtyMaxZ;
+				c.dirty = false;
+			}
 
 			int originX = cx * ChunkSize;
 			int originY = cy * ChunkSize;
@@ -322,12 +355,12 @@ namespace spades {
 			int wOriginX = originX - padding;
 			int wOriginY = originY - padding;
 			int wOriginZ = originZ - padding;
-			int wDirtyMinX = c.dirtyMinX;
-			int wDirtyMinY = c.dirtyMinY;
-			int wDirtyMinZ = c.dirtyMinZ;
-			int wDirtyMaxX = c.dirtyMaxX + padding * 2;
-			int wDirtyMaxY = c.dirtyMaxY + padding * 2;
-			int wDirtyMaxZ = c.dirtyMaxZ + padding * 2;
+			int wDirtyMinX = dirtyMinX;
+			int wDirtyMinY = dirtyMinY;
+			int wDirtyMinZ = dirtyMinZ;
+			int wDirtyMaxX = dirtyMaxX + padding * 2;
+			int wDirtyMaxY = dirtyMaxY + padding * 2;
+			int wDirtyMaxZ = dirtyMaxZ + padding * 2;
 
 			auto b = [](int i) -> std::uint8_t { return (std::uint8_t)1 << i; };
 			auto to_b = [](bool b, int i) -> std::uint8_t { return (std::uint8_t)b << i; };
@@ -465,15 +498,15 @@ namespace spades {
 			}
 
 			// Copy the result to `c.data`
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-			for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-			for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = dirtyMinZ; z <= dirtyMaxZ; z++)
+			for (int y = dirtyMinY; y <= dirtyMaxY; y++)
+			for (int x = dirtyMinX; x <= dirtyMaxX; x++) {
 				c.data[z][y][x][0] = wData[z + padding][y + padding][x + padding][0];
 				c.data[z][y][x][1] = wData[z + padding][y + padding][x + padding][1];
 			}
 
-			c.dirty = false;
-			c.transferDone = false;
+			// Hand the data over for upload
+			c.transferDone.store(false, std::memory_order_release);
 		}
 	} // namespace draw
 } // namespace spades
