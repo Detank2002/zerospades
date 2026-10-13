@@ -18,6 +18,8 @@
 
  */
 
+#include <cmath>
+
 #include "GLFramebufferManager.h"
 #include "GLGlareRenderer.h"
 #include "GLImage.h"
@@ -31,6 +33,17 @@
 
 namespace spades {
 	namespace draw {
+		namespace {
+			/** The radius of a glaring lamp's lens, in blocks: how much of the scene
+			 * around it is looked at to tell whether it is in sight (as the Vulkan
+			 * renderer's) */
+			constexpr float kSourceRadius = 0.1F;
+
+			/** How far nearer than the lamp something has to be drawn to hide it, in
+			 * blocks: the headlamp it shines from is drawn about as far as it. */
+			constexpr float kSourceOcclusionMargin = 0.25F;
+		} // namespace
+
 		GLGlareRenderer::GLGlareRenderer(GLRenderer& renderer)
 		    : renderer(renderer),
 		      device(renderer.GetGLDevice()),
@@ -64,6 +77,10 @@ namespace spades {
 			static GLProgramUniform glareColor("glareColor");
 			static GLProgramUniform depthTexture("depthTexture");
 			static GLProgramUniform firstPersonDepthEnd("firstPersonDepthEnd");
+			static GLProgramUniform zNearFar("zNearFar");
+			static GLProgramUniform sourceCoord("sourceCoord");
+			static GLProgramUniform sourceSpread("sourceSpread");
+			static GLProgramUniform sourceDepth("sourceDepth");
 
 			program->Use();
 			positionAttribute(program);
@@ -72,6 +89,10 @@ namespace spades {
 			glareColor(program);
 			depthTexture(program);
 			firstPersonDepthEnd(program);
+			zNearFar(program);
+			sourceCoord(program);
+			sourceSpread(program);
+			sourceDepth(program);
 
 			device.ActiveTexture(1);
 			device.BindTexture(IGLDevice::Texture2D,
@@ -81,6 +102,10 @@ namespace spades {
 			glareTexture.SetValue(0);
 
 			firstPersonDepthEnd.SetValue(GLRenderer::kFirstPersonDepthEnd);
+			zNearFar.SetValue(def.zNear, def.zFar);
+
+			const float tanHalfX = std::tan(def.fovX * 0.5F);
+			const float tanHalfY = std::tan(def.fovY * 0.5F);
 
 			// Added onto the frame: what is underneath stays.
 			device.Enable(IGLDevice::Blend, true);
@@ -103,6 +128,12 @@ namespace spades {
 				const float halfHeight = param.radius * ndcPerUnitY;
 				drawRange.SetValue(centreX - halfWidth, centreY - halfHeight, centreX + halfWidth,
 				                   centreY + halfHeight);
+
+				// What the scene draws in front of the lamp hides it (Glare.vs)
+				sourceCoord.SetValue(centreX * 0.5F + 0.5F, centreY * 0.5F + 0.5F);
+				sourceSpread.SetValue(kSourceRadius / (clip.w * tanHalfX) * 0.5F,
+				                      kSourceRadius / (clip.w * tanHalfY) * 0.5F);
+				sourceDepth.SetValue(clip.w - kSourceOcclusionMargin);
 
 				glareColor.SetValue(param.color.x, param.color.y, param.color.z);
 				glare.image->Bind(IGLDevice::Texture2D);

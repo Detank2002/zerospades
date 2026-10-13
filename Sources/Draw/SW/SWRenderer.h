@@ -92,6 +92,8 @@ namespace spades {
 			struct Glare {
 				Handle<SWImage> img;
 				client::GlareParam param;
+				// How much of its lamp is in sight (`MeasureGlareVisibility`)
+				float visibility = 1.0F;
 			};
 			std::vector<Glare> glares;
 
@@ -151,8 +153,12 @@ namespace spades {
 
 			template <SWFeatureLevel> void ApplyDynamicLight(const DynamicLight &);
 
-			/** Draws the scene's glares over the finished frame. This renderer can't
-			 * tell the first-person view's models apart, so they go under the glares. */
+			/** Measures how much of each glare's lamp the scene drawn so far leaves in
+			 * sight, as the Vulkan renderer does: done before the first-person view's
+			 * models are drawn, which say nothing of what stands before a lamp. */
+			void MeasureGlareVisibility();
+			/** Draws the scene's glares over the finished frame. The first-person
+			 * view's models go under them here: they share the scene's depth. */
 			void DrawGlares();
 
 			/** Dims what is drawn so far, the world and the sky, by the daylight, keeping

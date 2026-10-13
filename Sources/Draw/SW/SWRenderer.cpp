@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cfenv>
+#include <cmath>
 #include <cstdlib>
 
 #include "SWFlatMapRenderer.h"
@@ -748,6 +749,50 @@ namespace spades {
 			glares.push_back(std::move(glare));
 		}
 
+		void SWRenderer::MeasureGlareVisibility() {
+			// The radius of a glaring lamp's lens, in blocks, and how far nearer than
+			// it something has to be drawn to hide it, as the Vulkan renderer's
+			constexpr float kSourceRadius = 0.1F;
+			constexpr float kSourceOcclusionMargin = 0.25F;
+
+			const int fw = fb->GetWidth();
+			const int fh = fb->GetHeight();
+			const float tanHalfX = std::tan(sceneDef.fovX * 0.5F);
+			const float tanHalfY = std::tan(sceneDef.fovY * 0.5F);
+
+			for (Glare& glare : glares) {
+				const client::GlareParam& param = glare.param;
+				const Vector4 clip = projectionViewMatrix * param.origin;
+				if (clip.w <= sceneDef.zNear)
+					continue;
+
+				// The depth buffer holds the distance along the view axis, as `clip.w` is.
+				const float sourceDepth = clip.w - kSourceOcclusionMargin;
+
+				// Where the lamp is on the frame, and how far around that its lens spreads
+				const float centreX = (clip.x / clip.w * 0.5F + 0.5F) * fw;
+				const float centreY = (0.5F - clip.y / clip.w * 0.5F) * fh;
+				const float spreadX = kSourceRadius / (clip.w * tanHalfX) * 0.5F * fw;
+				const float spreadY = kSourceRadius / (clip.w * tanHalfY) * 0.5F * fh;
+
+				// Over a 3x3 grid across it: anything drawn in front of it, a player as
+				// much as a wall, hides it, and one half in front of it half its glare
+				int seen = 0;
+				for (int y = -1; y <= 1; y++) {
+					for (int x = -1; x <= 1; x++) {
+						const int px = static_cast<int>(std::floor(centreX + x * spreadX));
+						const int py = static_cast<int>(std::floor(centreY + y * spreadY));
+
+						// Off the frame, nothing is known to be in front of it.
+						if (px < 0 || py < 0 || px >= fw || py >= fh ||
+						    depthBuffer[px + py * fw] >= sourceDepth)
+							seen++;
+					}
+				}
+				glare.visibility = seen * (1.0F / 9.0F);
+			}
+		}
+
 		void SWRenderer::DrawGlares() {
 			if (glares.empty())
 				return;
@@ -767,9 +812,12 @@ namespace spades {
 				if (clip.w <= sceneDef.zNear)
 					continue;
 
+				if (glare.visibility <= 0.0F)
+					continue;
+
 				const float x = (clip.x / clip.w * 0.5F + 0.5F) * sw;
 				const float y = (0.5F - clip.y / clip.w * 0.5F) * sh;
-				const Vector3& color = param.color;
+				const Vector3 color = param.color * glare.visibility;
 
 				// Added onto the frame: a zero alpha keeps what is underneath.
 				SetColorAlphaPremultiplied(MakeVector4(color.x, color.y, color.z, 0.0F));
@@ -813,9 +861,15 @@ namespace spades {
 					mapRenderer->Render(sceneDef, *fb, depthBuffer.data());
 				}
 
-				// draw models
+				// draw models, the first-person view's last: what hides the glares is
+				// measured before them, which say nothing of what stands before a lamp
 				for (const auto& m : models)
-					modelRenderer->Render(*m.model, m.param);
+					if (!m.param.depthHack)
+						modelRenderer->Render(*m.model, m.param);
+				MeasureGlareVisibility();
+				for (const auto& m : models)
+					if (m.param.depthHack)
+						modelRenderer->Render(*m.model, m.param);
 				models.clear();
 
 				ApplyDaylight();
