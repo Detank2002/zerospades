@@ -1,61 +1,71 @@
-#: Sources/Client/Client.cpp:186 Sources/Client/Client.cpp:1221
+#: Sources/Client/Client.cpp:185 Sources/Client/Client.cpp:1219
 #: Sources/Client/Client_NetHandler.cpp:408
 #: Sources/Gui/UI/Components/LimboMenu.cpp:66
 msgctxt "Client"
 msgid "Spectator"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1180
+#: Sources/Client/Client.cpp:1178
 #, c++-format
 msgctxt "Client"
 msgid "Map saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1184 Sources/Client/Client.cpp:1189
+#: Sources/Client/Client.cpp:1182 Sources/Client/Client.cpp:1187
 msgctxt "Client"
 msgid "Saving map failed: "
 msgstr ""
 
-#: Sources/Client/Client.cpp:1218 Sources/Gui/UI/InGame/ChatWindow.cpp:260
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:354
+#: Sources/Client/Client.cpp:1216 Sources/Gui/UI/InGame/ChatWindow.cpp:597
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:692
 msgctxt "Client"
 msgid "Global"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1218 Sources/Gui/UI/InGame/ChatWindow.cpp:270
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:364
+#: Sources/Client/Client.cpp:1216 Sources/Gui/UI/InGame/ChatWindow.cpp:607
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:702
 msgctxt "Client"
 msgid "Team"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1228
+#: Sources/Client/Client.cpp:1226
 msgctxt "Client"
 msgid "(DEAD)"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1230
+#: Sources/Client/Client.cpp:1228
 msgctxt "Client"
 msgid "(SPEC)"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1238 Sources/Client/Client.cpp:1265
+#: Sources/Client/Client.cpp:1236 Sources/Client/Client.cpp:1263
 msgctxt "Client"
 msgid "[Global]"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1311
+#: Sources/Client/Client.cpp:1309
 msgctxt "Client"
 msgid "The server"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1446
+#: Sources/Client/Client.cpp:1444
 msgctxt "Client"
 msgid "This server does not allow team pings."
 msgstr ""
 
-#: Sources/Client/Client.cpp:1501
+#: Sources/Client/Client.cpp:1499
 msgctxt "Client"
 msgid "[PM] "
+msgstr ""
+
+#: Sources/Client/Client_Console.cpp:36
+msgctxt "Client"
+msgid "Save the current state of the map to the disk"
+msgstr ""
+
+#: Sources/Client/Client_Console.cpp:37
+msgctxt "Client"
+msgid "Set the block color (all values 0-255)"
 msgstr ""
 
 #: Sources/Client/Client_Draw.cpp:135
@@ -512,7 +522,7 @@ msgctxt "Client"
 msgid "{0} wins!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:768
+#: Sources/Client/Client_Update.cpp:765
 #, c++-format
 msgctxt "Client"
 msgid "{0} block"
@@ -520,123 +530,123 @@ msgid_plural "{0} blocks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: Sources/Client/Client_Update.cpp:773
+#: Sources/Client/Client_Update.cpp:770
 msgctxt "Client"
 msgid "-- blocks"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1277
+#: Sources/Client/Client_Update.cpp:1276
 #: Sources/Gui/UI/Components/LimboMenu.cpp:67
 msgctxt "Client"
 msgid "Rifle"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1278
+#: Sources/Client/Client_Update.cpp:1277
 #: Sources/Gui/UI/Components/LimboMenu.cpp:68
 msgctxt "Client"
 msgid "SMG"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1279
+#: Sources/Client/Client_Update.cpp:1278
 #: Sources/Gui/UI/Components/LimboMenu.cpp:69
 msgctxt "Client"
 msgid "Shotgun"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1283
+#: Sources/Client/Client_Update.cpp:1282
 msgctxt "Client"
 msgid "Fall"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1284
+#: Sources/Client/Client_Update.cpp:1283
 msgctxt "Client"
 msgid "Melee"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1285
+#: Sources/Client/Client_Update.cpp:1284
 msgctxt "Client"
 msgid "Grenade"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1286
+#: Sources/Client/Client_Update.cpp:1285
 msgctxt "Client"
 msgid "Headshot"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1287
+#: Sources/Client/Client_Update.cpp:1286
 msgctxt "Client"
 msgid "Team Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1288
+#: Sources/Client/Client_Update.cpp:1287
 msgctxt "Client"
 msgid "Weapon Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1340
+#: Sources/Client/Client_Update.cpp:1339
 msgctxt "Client"
 msgid "Revenge!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1348
+#: Sources/Client/Client_Update.cpp:1347
 msgctxt "Client"
 msgid "Dominating!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1374
+#: Sources/Client/Client_Update.cpp:1378
 #, c++-format
 msgctxt "Client"
 msgid "You were killed by {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1376
+#: Sources/Client/Client_Update.cpp:1380
 #, c++-format
 msgctxt "Client"
 msgid "You have killed {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1572
+#: Sources/Client/Client_Update.cpp:1576
 #, c++-format
 msgctxt "Client"
 msgid "You hit {0} from: {1} blocks "
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1592
+#: Sources/Client/Client_Update.cpp:1596
 msgctxt "Client"
 msgid "TORSO"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1593
+#: Sources/Client/Client_Update.cpp:1597
 msgctxt "Client"
 msgid "ARMS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1594
+#: Sources/Client/Client_Update.cpp:1598
 msgctxt "Client"
 msgid "LEGS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1595
+#: Sources/Client/Client_Update.cpp:1599
 msgctxt "Client"
 msgid "MELEE"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1596
+#: Sources/Client/Client_Update.cpp:1600
 msgctxt "Client"
 msgid "HEAD"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1925
+#: Sources/Client/Client_Update.cpp:1929
 msgctxt "Client"
 msgid "You are taking damage. Find solid ground!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1943
+#: Sources/Client/Client_Update.cpp:1947
 msgctxt "Client"
 msgid "Insufficient blocks."
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1946
+#: Sources/Client/Client_Update.cpp:1950
 msgctxt "Client"
 msgid "You cannot place a block there."
 msgstr ""
@@ -777,7 +787,7 @@ msgctxt "Client"
 msgid "{0} More"
 msgstr ""
 
-#: Sources/Client/ScoreboardView.cpp:61 Sources/Client/ScoreboardView.cpp:418
+#: Sources/Client/ScoreboardView.cpp:115 Sources/Client/ScoreboardView.cpp:457
 #, c++-format
 msgctxt "Client"
 msgid "Spectator{1}"
@@ -799,6 +809,21 @@ msgstr ""
 #: Sources/Core/ServerAddress.cpp:114
 msgctxt "ServerAddress"
 msgid "Localhost"
+msgstr ""
+
+#: Sources/Gui/ConsoleScreen.cpp:190
+msgctxt "Client"
+msgid "Display all available commands"
+msgstr ""
+
+#: Sources/Gui/ConsoleScreen.cpp:192
+msgctxt "Client"
+msgid "Clear the GFX (models and images) cache, forcing reload"
+msgstr ""
+
+#: Sources/Gui/ConsoleScreen.cpp:193
+msgctxt "Client"
+msgid "Clear the SFX cache, forcing reload"
 msgstr ""
 
 #: Sources/Gui/Main.cpp:982
@@ -879,7 +904,7 @@ msgstr ""
 
 #: Sources/Gui/UI/Components/LimboMenu.cpp:325
 #: Sources/Gui/UI/InGame/ChatLogWindow.cpp:95
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:239
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:576
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:632
 #: Sources/Gui/UI/Settings/PreferenceView.cpp:138
 msgctxt "Client"
@@ -927,9 +952,16 @@ msgctxt "MainScreen"
 msgid "Later"
 msgstr ""
 
+#: Sources/Gui/UI/Console/ConsoleCommandField.cpp:113
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:358
+#, c++-format
+msgctxt "Client"
+msgid "+{0} more"
+msgstr ""
+
 #: Sources/Gui/UI/Console/ConsoleWindow.cpp:62
 msgctxt "Console"
-msgid "Command"
+msgid "Type a command, e.g. help. Use Tab to autocomplete."
 msgstr ""
 
 #: Sources/Gui/UI/InGame/ChatLogWindow.cpp:94
@@ -942,24 +974,152 @@ msgctxt "Client"
 msgid "Say Global"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:104
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:114
-#, c++-format
-msgctxt "Client"
-msgid "[{0}]"
-msgstr ""
-
 #: Sources/Gui/UI/InGame/ChatLogWindow.cpp:113
 msgctxt "Client"
 msgid "Say Team"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:229
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:73
+msgctxt "Client"
+msgid "List the commands of the server"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:74
+msgctxt "Client"
+msgid "Print all available commands"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:75
+msgctxt "Client"
+msgid "Shows the current time limit"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:76
+msgctxt "Client"
+msgid "Shows information about your client"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:77
+msgctxt "Client"
+msgid "Shows what weapon a given player is using"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:78
+msgctxt "Client"
+msgid "Shows who's got the enemy intel"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:79
+msgctxt "Client"
+msgid "Shows player's accuracy per weapon"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:80
+msgctxt "Client"
+msgid "Shows K/D ratio"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:81
+msgctxt "Client"
+msgid "Shows how many kills in a row you got without dying"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:82
+msgctxt "Client"
+msgid "Shows current server latency in milliseconds"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:83
+msgctxt "Client"
+msgid "Show you the server rules"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:84
+msgctxt "Client"
+msgid "Use a medkit"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:85
+msgctxt "Client"
+msgid "Kill yourself or a given player"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:86
+msgctxt "Client"
+msgid "Make you or a given player no longer receive chat messages"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:87
+msgctxt "Client"
+msgid "Unstick yourself or a given player"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:88
+msgctxt "Client"
+msgid "Air support! Try it out just like that for more details"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:89
+msgctxt "Client"
+msgid "Summon an apocalypse on the enemy team"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:90
+msgctxt "Client"
+msgid "Creates or joins a squad, letting you spawn with friends"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:91
+msgctxt "Client"
+msgid "Log in if you're staff or a trusted member of this server"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:92
+msgctxt "Client"
+msgid "Send a private message to a given player"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:93
+msgctxt "Client"
+msgid "Send a message to all admins currently online"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:94
+msgctxt "Client"
+msgid "Start votekick against a player"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:95
+msgctxt "Client"
+msgid "Cancels a votekick"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:98
+msgctxt "Client"
+msgid "Heal and refill yourself or a given player"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:99
+msgctxt "Client"
+msgid "Go into god mode"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:100
+msgctxt "Client"
+msgid "Hold control and press space to fly"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:295
+msgctxt "Client"
+msgid "No matching commands or settings"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:566
 msgctxt "Client"
 msgid "Send"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:230
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:567
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:240
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:449
 #: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:54
@@ -967,26 +1127,38 @@ msgctxt "Client"
 msgid "[Enter]"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:238
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:575
 msgctxt "Client"
 msgid "Cancel"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:249
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:404
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:586
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:745
 msgctxt "Client"
-msgid "Chat Text"
+msgid "Type a message, use / for commands."
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:278
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:388
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:615
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:728
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:902
 msgctxt "Client"
 msgid "[Tab] Switch"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:377
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:719
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:886
 msgctxt "Client"
 msgid "[Enter] Send  [Esc] Cancel"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:884
+msgctxt "Client"
+msgid "[Tab] Autocomplete  [Enter] Send  [Esc] Cancel"
+msgstr ""
+
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:900
+msgctxt "Client"
+msgid "[Tab] Autocomplete"
 msgstr ""
 
 #: Sources/Gui/UI/InGame/ClientMenu.cpp:70

@@ -22,8 +22,12 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace spades {
+	namespace client {
+		class IFont;
+	}
 	namespace gui {
 		namespace ui {
 			/**
@@ -44,6 +48,14 @@ namespace spades {
 
 			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
 			std::string FormatFileSize(std::int64_t bytes);
+
+			/**
+			 * Splits `text` into rows that are at most `maxWidth` wide. A row breaks at its last
+			 * space when it has one, otherwise between two characters, so a URL or a path is
+			 * split instead of cut. Always returns at least one row.
+			 */
+			std::vector<std::string> WrapText(client::IFont& font, const std::string& text,
+			                                  float maxWidth);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

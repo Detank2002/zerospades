@@ -23,6 +23,7 @@
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 
+#include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/Utils/ConsoleCommand.h>
 
 namespace spades {
@@ -36,11 +37,15 @@ namespace spades {
 				std::size_t i = 0;
 				ConsoleCommandCandidate current;
 
-				void SkipUnknowns() {
+				// Moves to the next name that starts with the query (ignoring case, like the
+				// chat does) and is defined by the program. The order of `names` is kept.
+				void SkipToMatch() {
 					while (i < names.size()) {
-						Settings::ItemHandle cvarHandle{names[i], nullptr};
-						if (!cvarHandle.IsUnknown())
-							break;
+						if (ui::StringCommonPrefixLength(query, names[i]) == query.size()) {
+							Settings::ItemHandle cvarHandle{names[i], nullptr};
+							if (!cvarHandle.IsUnknown())
+								break;
+						}
 						++i;
 					}
 				}
@@ -48,46 +53,70 @@ namespace spades {
 			public:
 				ConfigNameIterator(const std::string& query)
 				    : names{Settings::GetInstance()->GetAllItemNames()}, query{query} {
-					// Find the starting position
-					i = std::lower_bound(names.begin(), names.end(), query) - names.begin();
-					SkipUnknowns();
+					SkipToMatch();
 				}
 
 				const ConsoleCommandCandidate& GetCurrent() override { return current; }
 
 				bool MoveNext() override {
-					if (i >= names.size() || !StartsWith(names[i], query))
+					if (i >= names.size())
 						return false;
 
 					// Create `ConsoleCommandCandidate` for the current
 					// config variable
 					Settings::ItemHandle cvarHandle{names[i], nullptr};
 					current.name = names[i];
-					current.description = " = \"" + EscapeQuotes(cvarHandle) + "\"";
+					current.description = EscapeQuotes(cvarHandle);
+					current.isVariable = true;
 
 					i++;
-					SkipUnknowns();
+					SkipToMatch();
 
 					return true;
 				}
 			};
+
+			/**
+			 * Returns the name of the config variable that `name` refers to, or an empty string.
+			 * An exact match wins, otherwise the case is ignored. Unknown items are skipped, so
+			 * no item is created for a name that is not a config variable.
+			 */
+			std::string ResolveConfigName(const std::string& name) {
+				std::string found;
+				for (const std::string& v : Settings::GetInstance()->GetAllItemNames()) {
+					if (v.size() != name.size() ||
+					    ui::StringCommonPrefixLength(v, name) != v.size())
+						continue;
+
+					Settings::ItemHandle handle{v, nullptr};
+					if (handle.IsUnknown())
+						continue;
+					if (v == name)
+						return v;
+					if (found.empty())
+						found = v;
+				}
+				return found;
+			}
 
 		} // namespace
 
 		bool ConfigConsoleResponder::ExecCommand(const Handle<ConsoleCommand>& cmd) {
 			SPADES_MARK_FUNCTION();
 
-			Settings::ItemHandle cvarHandle{cmd->GetName(), nullptr};
-			if (cvarHandle.IsUnknown())
+			const std::string name = ResolveConfigName(cmd->GetName());
+			if (name.empty())
 				return false;
+
+			Settings::ItemHandle cvarHandle{name, nullptr};
 
 			if (cmd->GetNumArguments() == 0) {
 				// Display the current value
-				SPLog("%s = \"%s\"", cmd->GetName().c_str(), EscapeQuotes(cvarHandle).c_str());
+				SPLog("%s = \"%s\"", name.c_str(), EscapeQuotes(cvarHandle).c_str());
 			} else if (cmd->GetNumArguments() == 1) {
 				// Set a new value
 				const std::string& newValue = cmd->GetArgument(0);
-				SPLog("%s = \"%s\" (previously \"%s\")", cmd->GetName().c_str(),
+				SPLog("%s = \"%s\" (previously \"%s\")", name.c_str(),
 				      EscapeQuotes(newValue).c_str(), EscapeQuotes(cvarHandle).c_str());
 				cvarHandle = newValue;
 			} else {

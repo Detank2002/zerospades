@@ -32,6 +32,8 @@ namespace spades {
 		struct ConsoleCommandCandidate {
 			std::string name;
 			std::string description;
+			/** True for config variables, false for real commands. Commands are drawn in their own color. */
+			bool isVariable = false;
 		};
 
 		/**

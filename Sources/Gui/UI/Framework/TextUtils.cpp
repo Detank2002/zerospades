@@ -21,6 +21,7 @@
 #include "TextUtils.h"
 #include <algorithm>
 #include <cctype>
+#include <Client/IFont.h>
 
 namespace spades {
 	namespace gui {
@@ -82,6 +83,60 @@ namespace spades {
 				if (bytes < 1024 * 1024)
 					return std::to_string(bytes / 1024) + " KB";
 				return std::to_string(bytes / (1024 * 1024)) + " MB";
+			}
+
+			std::vector<std::string> WrapText(client::IFont& font, const std::string& text,
+			                                  float maxWidth) {
+				std::vector<std::string> rows;
+				if (font.Measure(text).x <= maxWidth) {
+					rows.push_back(text);
+					return rows;
+				}
+
+				std::string row;
+				size_t lastSpace = std::string::npos; // position of the last space in `row`
+				size_t i = 0;
+				while (i < text.size()) {
+					// one whole UTF-8 character
+					size_t len = 1;
+					while (i + len < text.size() &&
+					       (static_cast<unsigned char>(text[i + len]) & 0xC0) == 0x80)
+						len++;
+					std::string ch = text.substr(i, len);
+
+					if (!row.empty() && font.Measure(row + ch).x > maxWidth) {
+						if (ch == " ") {
+							// the space itself would overflow: end the row here and drop it
+							rows.push_back(row);
+							row.clear();
+							lastSpace = std::string::npos;
+							i += len;
+						} else if (lastSpace != std::string::npos && lastSpace > 0) {
+							// break at the last space; the rest of the word starts the next row
+							std::string rest = row.substr(lastSpace + 1);
+							row.resize(lastSpace);
+							rows.push_back(row);
+							row = rest;
+							lastSpace = std::string::npos;
+							// `ch` is handled again, now against the shorter row
+						} else {
+							// no space to break at: split the word here
+							rows.push_back(row);
+							row.clear();
+							lastSpace = std::string::npos;
+							// `ch` starts the next row
+						}
+						continue;
+					}
+
+					if (ch == " ")
+						lastSpace = row.size();
+					row += ch;
+					i += len;
+				}
+				if (!row.empty())
+					rows.push_back(row);
+				return rows;
 			}
 		} // namespace ui
 	} // namespace gui

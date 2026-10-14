@@ -21,6 +21,7 @@
 #include <map>
 
 #include <Client/Fonts.h>
+#include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 
 #include "ConfigConsoleResponder.h"
@@ -182,11 +183,17 @@ namespace spades {
 			constexpr const char* CMD_CLEARGFXCACHE = "cleargfxcache";
 			constexpr const char* CMD_CLEARSFXCACHE = "clearsfxcache";
 
-			std::map<std::string, std::string> const g_commands{
-			  {CMD_HELP, ": Display all available commands"},
-			  {CMD_CLEARGFXCACHE, ": Clear the GFX (models and images) cache, forcing reload"},
-			  {CMD_CLEARSFXCACHE, ": Clear the SFX cache, forcing reload"},
-			};
+			// Built on the first call, after the language is known, and reused afterwards. The
+			// candidate iterators keep a reference to it, so it must outlive them.
+			const std::map<std::string, std::string>& GetCommands() {
+				static const std::map<std::string, std::string> commands{
+				  {CMD_HELP, _Tr("Client", "Display all available commands")},
+				  {CMD_CLEARGFXCACHE,
+				   _Tr("Client", "Clear the GFX (models and images) cache, forcing reload")},
+				  {CMD_CLEARSFXCACHE, _Tr("Client", "Clear the SFX cache, forcing reload")},
+				};
+				return commands;
+			}
 		} // namespace
 
 		bool ConsoleScreen::ExecCommand(const Handle<ConsoleCommand>& command) {
@@ -219,7 +226,7 @@ namespace spades {
 		Handle<ConsoleCommandCandidateIterator>
 		ConsoleScreen::AutocompleteCommandName(const std::string& name) {
 			SPADES_MARK_FUNCTION();
-			return MakeCandidates(g_commands, name) +
+			return MakeCandidates(GetCommands(), name) +
 				   ConfigConsoleResponder::AutocompleteCommandName(name) +
 				   subview->AutocompleteCommandName(name);
 		}

@@ -27,35 +27,82 @@
 #include <Core/Math.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/FieldWithHistory.h>
+#include <Gui/UI/Widgets/ListView.h>
 
 namespace spades {
 	namespace gui {
 		namespace ui {
+			class Label;
 			class TextViewer;
 		}
 	}
 	namespace client {
 		class ClientUI;
 		class ClientUIHelper;
+		class IFont;
 
-		/** Shows a cvar's current value when the user types something like "/cg_foo". */
+		/** One row of the list shown while the user types a "/" word. */
+		struct CommandFieldEntry {
+			std::string name;
+			std::string text;
+			bool isServerCommand = false;
+		};
+
+		/** Shows the settings and server commands that match what the user typed after "/". */
 		class CommandFieldConfigValueView : public gui::ui::UIElement {
-			std::vector<std::string> configNames;
-			std::vector<std::string> configValues;
+			/** One displayed row: the first one of an entry also shows its name. */
+			struct Row {
+				size_t entry = 0;
+				std::string text; // the part of the value shown in this row
+				bool first = false;
+				std::string head; // the part of the name that was already typed
+				std::string tail;
+				float headW = 0.0F;
+			};
+
+			std::vector<CommandFieldEntry> entries;
+			size_t prefixLength;
+			bool fillBounds;
+			size_t extraCount; // matches that are not in `entries`
+
+			// The layout is measured on the first frame and reused by every later one.
+			bool laidOut = false;
+			std::vector<Row> rows;
+			std::string moreText; // empty when every entry is shown
+			std::string emptyText; // translated once in BuildRows
+			float nameColumnW = 0.0F;
+			float boxW = 0.0F;
+
+			void BuildRows(IFont& font, size_t maxRows);
 
 		public:
+			/**
+			 * `prefixLength` is how many characters of each name the user already typed.
+			 * With `fillBounds` the rows fill the bounds of the element (it replaces the chat
+			* history), otherwise a framed list is drawn above the element, as wide as its
+			* content and no wider than the element: a longer value continues on more rows.
+			 */
 			CommandFieldConfigValueView(gui::ui::UIManager* manager,
-			                            std::vector<std::string> configNames);
+			                            std::vector<CommandFieldEntry> entries, size_t prefixLength,
+			                            bool fillBounds, size_t extraCount = 0);
 			void Render() override;
 		};
 
-		/** Chat input field with "/cvar" completion and value preview. */
+		/** Chat input field with "/cvar" and server command completion and value preview. */
 		class CommandField : public gui::ui::FieldWithHistory {
 			Handle<CommandFieldConfigValueView> valueView;
 
 		public:
 			/** Called when Tab is pressed while no "/cvar" completion applies. */
 			std::function<void()> tabPressed;
+
+			/**
+			 * When set, the owner shows the list of matching entries instead of the field
+			 * showing its own floating one. `active` is false when nothing is to be listed.
+			 */
+			std::function<void(const std::vector<CommandFieldEntry>& entries, size_t prefixLength,
+			                   bool active)>
+				configListChanged;
 
 			CommandField(gui::ui::UIManager* manager,
 						 std::vector<gui::ui::CommandHistoryItem>* history);
@@ -66,12 +113,9 @@ namespace spades {
 
 		/** How a `ClientChatWindow` is laid out. */
 		enum class ChatWindowMode {
-			/** The composer alone, centered near the bottom of the screen. */
-			Centered,
-			/** The composer below a scrollable chat history, at the bottom left. */
-			Docked,
-			/** Only the chat history, without input, shown while the peek key is held. */
-			Peek
+			Centered, 	/** The composer alone, centered near the bottom of the screen. */
+			Docked, 	/** The composer below a scrollable chat history, at the bottom left. */
+			Peek 		/** Only the chat history, without input, shown while the peek key is held. */
 		};
 
 		/** The floating chat composer (global/team) shown while playing. */
@@ -82,6 +126,18 @@ namespace spades {
 			ChatWindowMode mode;
 
 			gui::ui::TextViewer* viewer = nullptr; // weak; owned as a child
+			// While a "/" word is typed, one of these replaces the history: the scrollable list of
+			// matches, or the message shown when nothing matches.
+			Handle<gui::ui::ListViewBase> configList;
+			Handle<CommandFieldConfigValueView> configMessage;
+
+			// What Tab does in the composer, and so which hint is shown next to the toggles.
+			enum class TabHint { Switch, Autocomplete, None };
+
+			// weak; owned as children. Null when the mode does not show them.
+			gui::ui::Label* hintKeys = nullptr;   // docked: the keys of the composer, right aligned
+			gui::ui::Label* hintSwitch = nullptr; // the Tab hint next to the toggles
+			TabHint tabHint = TabHint::Switch;
 
 			// Frame of the docked and peek views, relative to this window
 			float frameX = 0.0F;
@@ -101,6 +157,9 @@ namespace spades {
 			void OnCancel(gui::ui::UIElement& sender);
 			bool CheckAndSetConfigVariable();
 			void OnSay(gui::ui::UIElement& sender);
+			void OnConfigListChanged(const std::vector<CommandFieldEntry>& entries,
+			                         size_t prefixLength, bool active);
+			void UpdateHints();
 
 		protected:
 			virtual void Close();

@@ -42,6 +42,8 @@ namespace spades {
 		using gui::ui::Button;
 		using gui::ui::CommandHistoryItem;
 		using gui::ui::Label;
+		using gui::ui::ListViewBase;
+		using gui::ui::ListViewModel;
 		using gui::ui::MouseButton;
 		using gui::ui::SetColorNP;
 		using gui::ui::SimpleButton;
@@ -59,59 +61,386 @@ namespace spades {
 				color.w = 1.0F;
 				return color;
 			}
+
+			struct ServerCommandInfo {
+				const char* name;
+				std::string description; // already translated
+			};
+
+			// Commands the server understands. The client only suggests them: they are sent as ordinary chat.
+			std::vector<ServerCommandInfo> GetServerCommands() {
+				return {
+					{"help", _Tr("Client", "List the commands of the server")},
+					{"commands", _Tr("Client", "Print all available commands")},
+					{"time", _Tr("Client", "Shows the current time limit")},
+					{"client", _Tr("Client", "Shows information about your client")},
+					{"weapon", _Tr("Client", "Shows what weapon a given player is using")},
+					{"intel", _Tr("Client", "Shows who's got the enemy intel")},
+					{"accuracy", _Tr("Client", "Shows player's accuracy per weapon")},
+					{"ratio", _Tr("Client", "Shows K/D ratio")},
+					{"streak", _Tr("Client", "Shows how many kills in a row you got without dying")},
+					{"ping", _Tr("Client", "Shows current server latency in milliseconds")},
+					{"rules", _Tr("Client", "Show you the server rules")},
+					{"medkit", _Tr("Client", "Use a medkit")},
+					{"kill", _Tr("Client", "Kill yourself or a given player")},
+					{"deaf", _Tr("Client", "Make you or a given player no longer receive chat messages")},
+					{"unstick", _Tr("Client", "Unstick yourself or a given player")},
+					{"airstrike", _Tr("Client", "Air support! Try it out just like that for more details")},
+					{"apoc", _Tr("Client", "Summon an apocalypse on the enemy team")},
+					{"squad", _Tr("Client", "Creates or joins a squad, letting you spawn with friends")},
+					{"login", _Tr("Client", "Log in if you're staff or a trusted member of this server")},
+					{"pm", _Tr("Client", "Send a private message to a given player")},
+					{"admin", _Tr("Client", "Send a message to all admins currently online")},
+					{"votekick", _Tr("Client", "Start votekick against a player")},
+					{"cancel", _Tr("Client", "Cancels a votekick")},
+
+					// may require staff perms
+					{"heal", _Tr("Client", "Heal and refill yourself or a given player")},
+					{"god", _Tr("Client", "Go into god mode")},
+					{"fly", _Tr("Client", "Hold control and press space to fly")},
+				};
+			}
+
+			/**
+			 * Builds the entries that match `input` (the text typed after "/"): the server
+			 * commands first, then the settings, up to `maxEntries` in total. When
+			 * `totalMatches` is given it receives the number of matches, listed or not.
+			 */
+			std::vector<CommandFieldEntry> FindEntries(const std::string& input,
+			                                           size_t maxEntries,
+			                                           size_t* totalMatches = nullptr) {
+				std::vector<CommandFieldEntry> result;
+				size_t total = 0;
+
+				// built on the first call, after the language is known, and reused afterwards
+				static const std::vector<ServerCommandInfo> serverCommands = GetServerCommands();
+				for (const ServerCommandInfo& cmd : serverCommands) {
+					std::string name = cmd.name;
+					if (StringCommonPrefixLength(input, name) != input.size())
+						continue;
+
+					total++;
+					if (result.size() < maxEntries) {
+						CommandFieldEntry e;
+						e.name = name;
+						e.text = cmd.description;
+						e.isServerCommand = true;
+						result.push_back(std::move(e));
+					}
+				}
+
+				std::vector<std::string> names = Settings::GetInstance()->GetAllItemNames();
+				for (const std::string& n : names) {
+					if (StringCommonPrefixLength(input, n) != input.size())
+						continue;
+
+					// one lookup per match, reused for the unknown check and for the value
+					Settings::ItemHandle item(n, nullptr);
+					if (item.IsUnknown())
+						continue;
+
+					total++;
+					if (result.size() < maxEntries) {
+						CommandFieldEntry e;
+						e.name = n;
+						e.text = static_cast<std::string>(item);
+						result.push_back(std::move(e));
+					}
+				}
+
+				if (totalMatches)
+					*totalMatches = total;
+				return result;
+			}
+
+			/** One row of the scrollable entry list: the name with its typed prefix, then a part of the value. */
+			class CommandFieldListRow : public UIElement {
+				std::string name;
+				bool isServerCommand;
+				std::string valueLine; // the part of the value shown in this row
+				bool first;            // only the first row of an entry shows its name
+				size_t prefixLength;
+				float valueX; // distance from the left edge of the row to the value column
+
+				// measured once, on the first frame, instead of in every frame
+				bool prepared = false;
+				std::string head;
+				std::string tail;
+				float headW = 0.0F;
+
+			public:
+				CommandFieldListRow(UIManager* manager, const CommandFieldEntry& entry,
+				                    const std::string& valueLine, bool first, size_t prefixLength,
+				                    float valueX)
+				    : UIElement(manager),
+				      name(entry.name),
+				      isServerCommand(entry.isServerCommand),
+				      valueLine(valueLine),
+				      first(first),
+				      prefixLength(prefixLength),
+				      valueX(valueX) {}
+
+				void Render() override {
+					client::IFont* font = GetFont();
+					if (!font)
+						return;
+					Vector2 pos = GetScreenPosition();
+
+					// same colors as `CommandFieldConfigValueView`
+					const Vector4 matchColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
+					const Vector4 nameColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.5F);
+					const Vector4 valueColor = MakeVector4(0.75F, 0.75F, 1.0F, 1.0F);
+					const Vector4 cmdMatchColor = MakeVector4(1.0F, 0.72F, 0.3F, 1.0F);
+					const Vector4 cmdNameColor = MakeVector4(1.0F, 0.72F, 0.3F, 0.5F);
+					const Vector4 cmdTextColor = MakeVector4(0.85F, 0.75F, 0.6F, 1.0F);
+
+					const bool cmd = isServerCommand;
+
+					if (first) {
+						if (!prepared) {
+							// the part of the name that was already typed is highlighted
+							size_t split = std::min(prefixLength, name.size());
+							head = name.substr(0, split);
+							tail = name.substr(split);
+							headW = std::ceil(font->Measure(head).x);
+							prepared = true;
+						}
+						font->Draw(head, pos, 1.0F, cmd ? cmdMatchColor : matchColor);
+						font->Draw(tail, MakeVector2(pos.x + headW, pos.y), 1.0F,
+						                 cmd ? cmdNameColor : nameColor);
+					}
+
+					font->Draw(valueLine, MakeVector2(pos.x + valueX, pos.y), 1.0F,
+					                 cmd ? cmdTextColor : valueColor);
+				}
+			};
+
+			/**
+			 * Supplies the rows of the entry list. The value column is aligned over all matches,
+			 * and a value that does not fit continues on the following rows.
+			 */
+			class CommandFieldListModel : public ListViewModel {
+				/** One displayed row: a part of the value of an entry. */
+				struct Row {
+					size_t entry;
+					std::string text;
+					bool first;
+				};
+
+				UIManager* manager; // weak
+				std::vector<CommandFieldEntry> entries;
+				size_t prefixLength;
+				float valueX = 0.0F;
+				std::vector<Row> rows;
+
+			public:
+				CommandFieldListModel(UIManager* manager, std::vector<CommandFieldEntry> list,
+				                      size_t prefixLength, IFont& font, float columnGap,
+				                      float width)
+				    : manager(manager), entries(std::move(list)), prefixLength(prefixLength) {
+					float maxNameLen = 0.0F;
+					for (const CommandFieldEntry& e : entries)
+						maxNameLen = std::max(maxNameLen, std::ceil(font.Measure(e.name).x));
+					valueX = maxNameLen + columnGap;
+
+					const float valueWidth = std::max(width - valueX, 40.0F);
+					for (size_t i = 0; i < entries.size(); i++) {
+						std::vector<std::string> lines =
+							gui::ui::WrapText(font, entries[i].text, valueWidth);
+						for (size_t l = 0; l < lines.size(); l++)
+							rows.push_back(Row{i, lines[l], l == 0});
+					}
+				}
+
+				int GetNumRows() override { return static_cast<int>(rows.size()); }
+
+				Handle<UIElement> CreateElement(int row) override {
+					const Row& r = rows[row];
+					return Handle<CommandFieldListRow>::New(manager, entries[r.entry], r.text,
+					                                        r.first, prefixLength, valueX)
+					    .Cast<UIElement>();
+				}
+			};
 		} // namespace
 
 		// -- CommandFieldConfigValueView --
 
 		CommandFieldConfigValueView::CommandFieldConfigValueView(UIManager* manager,
-		                                                         std::vector<std::string> names)
-		    : UIElement(manager), configNames(std::move(names)) {
-			for (const std::string& n : configNames)
-				configValues.push_back(
-				    static_cast<std::string>(Settings::ItemHandle(n, nullptr)));
+		                                                         std::vector<CommandFieldEntry> list,
+		                                                         size_t prefixLength,
+		                                                         bool fillBounds,
+		                                                         size_t extraCount)
+		    : UIElement(manager),
+		      entries(std::move(list)),
+		      prefixLength(prefixLength),
+		      fillBounds(fillBounds),
+		      extraCount(extraCount) {}
+
+		void CommandFieldConfigValueView::BuildRows(IFont& font, size_t maxRows) {
+			const float pad = 8.0F;
+			const float columnGap = 20.0F;
+
+			rows.clear();
+			moreText.clear();
+			laidOut = true;
+
+			// The element is the widest the box may be: the field for the floating list, the history
+			// for the list that replaces it.
+			const float widestBoxW = size.x;
+			boxW = widestBoxW;
+
+			if (entries.empty()) {
+				// the "no match" message
+				nameColumnW = 0.0F;
+				emptyText = _Tr("Client", "No matching commands or settings");
+				if (!fillBounds)
+					boxW = std::min(boxW, std::ceil(font.Measure(emptyText).x) + pad * 2.0F);
+				return;
+			}
+
+			float maxNameLen = 0.0F;
+			float maxValueLen = 0.0F;
+			for (const CommandFieldEntry& e : entries) {
+				maxNameLen = std::max(maxNameLen, std::ceil(font.Measure(e.name).x));
+				maxValueLen = std::max(maxValueLen, std::ceil(font.Measure(e.text).x));
+			}
+			nameColumnW = maxNameLen + columnGap;
+
+			// A value stays on one line unless it is wider than the box. Nothing is ever cut.
+			float contentW = fillBounds ? boxW : boxW - pad * 2.0F;
+			if (!fillBounds) {
+				// The floating box fits its content, like the console list. It only grows to the
+				// width of the field when a value is too long for it, and then the value continues
+				// on the next rows.
+				contentW = std::min(contentW, nameColumnW + maxValueLen);
+				boxW = contentW + pad * 2.0F;
+			}
+			const float valueW = std::max(contentW - nameColumnW, 40.0F);
+
+			auto fill = [&](size_t limit) {
+				rows.clear();
+				for (size_t i = 0; i < entries.size(); i++) {
+					std::vector<std::string> lines =
+					    gui::ui::WrapText(font, entries[i].text, valueW);
+					// whole entries only, except that the first one is always shown
+					if (!rows.empty() && rows.size() + lines.size() > limit)
+						break;
+
+					for (size_t l = 0; l < lines.size(); l++) {
+						Row row;
+						row.entry = i;
+						row.text = lines[l];
+						row.first = (l == 0);
+						if (row.first) {
+							size_t split = std::min(prefixLength, entries[i].name.size());
+							row.head = entries[i].name.substr(0, split);
+							row.tail = entries[i].name.substr(split);
+							row.headW = std::ceil(font.Measure(row.head).x);
+						}
+						rows.push_back(std::move(row));
+					}
+				}
+				if (rows.size() > limit)
+					rows.resize(limit);
+			};
+			// the entries that are not shown, plus the matches that were never listed
+			auto countHidden = [&]() {
+				size_t shown = rows.empty() ? 0 : rows.back().entry + 1;
+				return entries.size() - shown + extraCount;
+			};
+
+			fill(maxRows);
+			size_t hidden = countHidden();
+			if (hidden > 0 && maxRows > 1) {
+				// the last row is kept for the "more" line
+				fill(maxRows - 1);
+				hidden = countHidden();
+				moreText = _Tr("Client", "+{0} more", hidden);
+
+				// the floating box must be wide enough for it
+				if (!fillBounds)
+					boxW = std::min(widestBoxW,
+					                std::max(boxW, std::ceil(font.Measure(moreText).x) + pad * 2.0F));
+			}
 		}
 
 		void CommandFieldConfigValueView::Render() {
-			float maxNameLen = 0.0F;
-			float maxDescLen = 0.0F;
 			client::IFont* font = GetFont();
 			if (!font)
 				return;
 			client::IRenderer& r = GetManager().GetRenderer();
-			float rowHeight = 24.0F;
 
-			for (size_t i = 0, len = configNames.size(); i < len; i++) {
-				maxNameLen = std::max(maxNameLen, font->Measure(configNames[i]).x);
-				maxDescLen = std::max(maxDescLen, font->Measure(configValues[i]).x);
-			}
-
-			float w = maxNameLen + maxDescLen + 20.0F;
-			float h = static_cast<float>(configNames.size()) * rowHeight + 10.0F;
+			const float pad = 8.0F;
+			const float rowHeight = 22.0F;
 
 			Vector2 pos = GetScreenPosition();
-			pos.y -= h;
-			pos.y += rowHeight - 10.0F;
 
-			// draw background
-			SetColorNP(r, MakeVector4(0.0F, 0.0F, 0.0F, 0.9F));
-			r.DrawFilledRect(pos.x + 1, pos.y + 1, pos.x + w - 1, pos.y + h - 1);
+			if (!laidOut) {
+				// The floating list grows upwards from the field, so only the rows that fit
+				// above it are kept.
+				float room = fillBounds ? size.y : pos.y - 1.0F - pad - 4.0F;
+				BuildRows(*font,
+				          static_cast<size_t>(std::max(1.0F, std::floor(room / rowHeight))));
+			}
 
-			SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.1F));
-			r.DrawOutlinedRect(pos.x, pos.y, pos.x + w, pos.y + h);
+			// the "no match" message takes one line
+			const float contentH =
+			    static_cast<float>(std::max<size_t>(rows.size(), 1) + (moreText.empty() ? 0 : 1)) *
+			    rowHeight;
 
-			// draw cvar list
-			Vector4 nameColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.7F);
-			Vector4 nameShadow = MakeVector4(0.0F, 0.0F, 0.0F, 0.3F);
-			Vector4 descColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
-			Vector4 descShadow = MakeVector4(0.0F, 0.0F, 0.0F, 0.4F);
+			float textX, textY;
+			if (fillBounds) {
+				// rows sit at the bottom, next to the composer, like the history lines
+				textX = pos.x;
+				textY = pos.y + size.y - contentH;
+			} else {
+				// framed list right above the field, as wide as its content
+				const float h = contentH + pad;
+				const float top = pos.y - 1.0F - h;
+				const float left = pos.x;
 
-			for (size_t i = 0, len = configNames.size(); i < len; i++) {
-				float y = 8.0F + static_cast<float>(i) * rowHeight;
-				Vector2 namePos = pos + MakeVector2(5.0F, y - 2.0F);
-				Vector2 descPos = pos + MakeVector2(15.0F + maxNameLen, y - 2.0F);
+				SetColorNP(r, MakeVector4(0.0F, 0.0F, 0.0F, 0.9F));
+				r.DrawFilledRect(left + 1, top + 1, left + boxW - 1, top + h - 1);
+				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.1F));
+				r.DrawOutlinedRect(left, top, left + boxW, top + h);
 
-				font->DrawShadow(configNames[i], namePos, 1.0F, nameColor, nameShadow);
-				font->DrawShadow(configValues[i], descPos, 1.0F, descColor, descShadow);
+				textX = left + pad;
+				textY = top + pad * 0.5F;
+			}
+
+			const Vector4 matchColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
+			const Vector4 nameColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.5F);
+			const Vector4 valueColor = MakeVector4(0.75F, 0.75F, 1.0F, 1.0F);
+			const Vector4 cmdMatchColor = MakeVector4(1.0F, 0.72F, 0.3F, 1.0F);
+			const Vector4 cmdNameColor = MakeVector4(1.0F, 0.72F, 0.3F, 0.55F);
+			const Vector4 cmdTextColor = MakeVector4(0.85F, 0.75F, 0.6F, 1.0F);
+
+			if (entries.empty()) {
+				font->Draw(emptyText, MakeVector2(textX, textY), 1.0F, nameColor);
+				return;
+			}
+
+			const float valueX = textX + nameColumnW;
+
+			for (size_t i = 0; i < rows.size(); i++) {
+				const Row& row = rows[i];
+				const bool cmd = entries[row.entry].isServerCommand;
+				const float y = textY + static_cast<float>(i) * rowHeight;
+
+				if (row.first) {
+					font->Draw(row.head, MakeVector2(textX, y), 1.0F,
+					                 cmd ? cmdMatchColor : matchColor);
+					font->Draw(row.tail, MakeVector2(textX + row.headW, y), 1.0F,
+					                 cmd ? cmdNameColor : nameColor);
+				}
+				font->Draw(row.text, MakeVector2(valueX, y), 1.0F,
+				                 cmd ? cmdTextColor : valueColor);
+			}
+
+			if (!moreText.empty()) {
+				const float y = textY + static_cast<float>(rows.size()) * rowHeight;
+				font->Draw(moreText, MakeVector2(textX, y), 1.0F,
+				           MakeVector4(1.0F, 1.0F, 1.0F, 0.4F));
 			}
 		}
 
@@ -126,31 +455,39 @@ namespace spades {
 			if (valueView)
 				valueView->SetParent(nullptr);
 
+			std::vector<CommandFieldEntry> entries;
+			size_t prefixLength = 0;
+			size_t extraCount = 0;
+			bool active = false;
+
 			const std::string& text = GetText();
 			if (text.substr(0, 1) == "/" && text.substr(1, 1) != " ") {
 				size_t wsPos = text.find(' ');
-				int whitespace =
-				    (wsPos == std::string::npos) ? static_cast<int>(text.size()) : static_cast<int>(wsPos);
+				int whitespace = (wsPos == std::string::npos) ? static_cast<int>(text.size())
+				                                              : static_cast<int>(wsPos);
 
-				std::string input = text.substr(1, whitespace - 1);
-				if (input.size() >= 2) {
-					std::vector<std::string> names = Settings::GetInstance()->GetAllItemNames();
-					std::vector<std::string> filteredNames;
-					for (const std::string& n : names) {
-						if (StringCommonPrefixLength(input, n) == input.size() &&
-						    !Settings::ItemHandle(n, nullptr).IsUnknown()) {
-							filteredNames.push_back(n);
-							if (filteredNames.size() >= 8)
-								break; // too many
-						}
-					}
-					if (filteredNames.size() > 0) {
-						valueView = Handle<CommandFieldConfigValueView>::New(
-						    &GetManager(), std::move(filteredNames));
-						valueView->SetBounds(AABB2(0.0F, -15.0F, 0.0F, 0.0F));
-						valueView->SetParent(this);
-					}
+				std::string candidates = text.substr(1, whitespace - 1);
+				if (candidates.size() > 0) {
+					prefixLength = candidates.size();
+					// an owner with a scrollable list shows every match, the floating list is limited
+					size_t totalMatches = 0;
+					entries = FindEntries(candidates, configListChanged ? 1000 : 16, &totalMatches);
+					extraCount = totalMatches - entries.size();
+					active = true;
 				}
+			}
+
+			// the owner draws the list in its own layout
+			if (configListChanged) {
+				configListChanged(entries, prefixLength, active);
+				return;
+			}
+
+			if (active) {
+				valueView = Handle<CommandFieldConfigValueView>::New(
+				    &GetManager(), std::move(entries), prefixLength, false, extraCount);
+				valueView->SetBounds(AABB2(0.0F, 0.0F, size.x, 0.0F));
+				valueView->SetParent(this);
 			}
 		}
 
@@ -158,29 +495,29 @@ namespace spades {
 			if (key == "Tab") {
 				const std::string& text = GetText();
 				if (text.substr(0, 1) == "/") {
-					if (GetSelectionLength() == 0 && GetSelectionStart() == static_cast<int>(text.size()) &&
-						text.find(' ') == std::string::npos) {
-						// config variable auto completion
+					if (GetSelectionLength() == 0 &&
+					    GetSelectionStart() == static_cast<int>(text.size()) &&
+					    text.find(' ') == std::string::npos) {
+						// completion over the server commands and the settings
 						std::string input = text.substr(1);
-						std::vector<std::string> names = Settings::GetInstance()->GetAllItemNames();
+						std::vector<CommandFieldEntry> matches = FindEntries(input, 1000);
 						std::string commonPart;
 						bool foundOne = false;
-						for (const std::string& n : names) {
-							if (StringCommonPrefixLength(input, n) == input.size() &&
-								!Settings::ItemHandle(n, nullptr).IsUnknown()) {
-								if (!foundOne) {
-									commonPart = n;
-									foundOne = true;
-								}
-
-								size_t commonLen = StringCommonPrefixLength(commonPart, n);
-								commonPart = commonPart.substr(0, commonLen);
+						for (const CommandFieldEntry& e : matches) {
+							if (!foundOne) {
+								commonPart = e.name;
+								foundOne = true;
 							}
+
+							size_t commonLen = StringCommonPrefixLength(commonPart, e.name);
+							commonPart = commonPart.substr(0, commonLen);
 						}
 
 						if (commonPart.size() > input.size()) {
 							SetText("/" + commonPart);
 							Select(static_cast<int>(GetText().size()), 0);
+							// refresh the list: the typed prefix is now the completed name
+							OnChanged();
 						}
 					}
 				} else if (tabPressed) {
@@ -246,7 +583,7 @@ namespace spades {
 				    Handle<CommandField>::New(manager, &ui->GetChatHistory());
 				field = f.GetPointerOrNull();
 				field->SetBounds(AABB2(winX, winY, winW, 30.0F));
-				field->placeholder = _Tr("Client", "Chat Text");
+				field->placeholder = _Tr("Client", "Type a message, use / for commands.");
 				field->maxLength = 90;
 				field->removeNewlines = true;
 				field->changed = [this](UIElement& s) { OnFieldChanged(s); };
@@ -283,8 +620,9 @@ namespace spades {
 				label->text = switchHint;
 				label->textColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.5F);
 				label->SetBounds(AABB2(winX + 70.0F * 2.0F + 1.0F + 8.0F, winY + 36.0F + 5.0F,
-									   switchW + 2.0F, 20.0F));
+				                       switchW + 2.0F, 20.0F));
 				AddChild(label.GetPointerOrNull());
+				hintSwitch = label.GetPointerOrNull();
 			}
 
 			UpdateState();
@@ -373,15 +711,17 @@ namespace spades {
 				const float toggleEnd = contentX + toggleW * 2.0F + 1.0F;
 				const float hintGap = 8.0F;
 
-				// right aligned: the keys of the composer
-				std::string hint = _Tr("Client", "[Enter] Send  [Esc] Cancel");
-				float hintW = std::ceil(font->Measure(hint).x);
+				// right aligned: the keys of the composer. The label spans all the room right of the
+				// toggles, so a longer text grows to the left and only `text` has to change.
 				{
+					const float left = toggleEnd + hintGap;
 					Handle<Label> label = Handle<Label>::New(manager);
-					label->text = hint;
+					label->text = _Tr("Client", "[Enter] Send  [Esc] Cancel");
 					label->textColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.5F);
-					label->SetBounds(AABB2(contentX + contentW - hintW, headerY + 4.0F, hintW + 2.0F, 20.0F));
+					label->alignment = MakeVector2(1.0F, 0.0F);
+					label->SetBounds(AABB2(left, headerY + 4.0F, contentX + contentW - left, 20.0F));
 					AddChild(label.GetPointerOrNull());
+					hintKeys = label.GetPointerOrNull();
 				}
 
 				// next to the toggles it controls
@@ -393,6 +733,7 @@ namespace spades {
 					label->textColor = MakeVector4(1.0F, 1.0F, 1.0F, 0.5F);
 					label->SetBounds(AABB2(toggleEnd + hintGap, headerY + 4.0F, switchW + 2.0F, 20.0F));
 					AddChild(label.GetPointerOrNull());
+					hintSwitch = label.GetPointerOrNull();
 				}
 			}
 
@@ -401,11 +742,15 @@ namespace spades {
 				Handle<CommandField> f = Handle<CommandField>::New(manager, &ui->GetChatHistory());
 				field = f.GetPointerOrNull();
 				field->SetBounds(AABB2(contentX, composerY, contentW, rowH));
-				field->placeholder = _Tr("Client", "Chat Text");
+				field->placeholder = _Tr("Client", "Type a message, use / for commands.");
 				field->maxLength = 90;
 				field->removeNewlines = true;
 				field->changed = [this](UIElement& s) { OnFieldChanged(s); };
 				field->tabPressed = [this]() { SetIsTeamChat(!isTeamChat); };
+				field->configListChanged = [this](const std::vector<CommandFieldEntry>& entries,
+				                                  size_t prefixLength, bool active) {
+					OnConfigListChanged(entries, prefixLength, active);
+				};
 				AddChild(field);
 			}
 
@@ -452,14 +797,112 @@ namespace spades {
 				viewer->AddLine(text, true, HistoryColor(color));
 		}
 
+		void ClientChatWindow::OnConfigListChanged(const std::vector<CommandFieldEntry>& entries,
+		                                           size_t prefixLength, bool active) {
+			if (configList)
+				configList->SetParent(nullptr);
+			if (configMessage)
+				configMessage->SetParent(nullptr);
+			if (!viewer)
+				return;
+
+			client::IFont* font = GetFont();
+
+			// the list takes the place of the history while a "/" word is being typed
+			viewer->visible = !(active && font);
+			if (!active || !font)
+				return;
+
+			if (entries.empty()) {
+				// nothing matches: say so, in the place of the history
+				configMessage = Handle<CommandFieldConfigValueView>::New(&GetManager(), entries,
+				                                                         prefixLength, true);
+				configMessage->SetBounds(viewer->GetBounds());
+				AddChild(configMessage.GetPointerOrNull());
+				return;
+			}
+
+			const float columnGap = 20.0F;
+
+			configList = Handle<ListViewBase>::New(&GetManager());
+			AddChild(configList.GetPointerOrNull());
+			// same rows as the history, so the list takes the place of its lines
+			configList->rowHeight = viewer->rowHeight;
+			configList->bottomAligned = true;
+
+			// Long values continue on the following rows. They are wrapped for the width left
+			// by the scroll bar, which is only removed afterwards, so a row is never too wide.
+			Handle<CommandFieldListModel> model = Handle<CommandFieldListModel>::New(
+			    &GetManager(), entries, prefixLength, *font, columnGap,
+			    viewer->size.x - configList->scrollBarWidth);
+
+			// the scroll bar only takes room when some rows do not fit
+			const int fitting =
+			    static_cast<int>(std::floor(viewer->size.y / configList->rowHeight));
+			if (model->GetNumRows() <= fitting)
+				configList->scrollBarWidth = 0.0F;
+			configList->SetBounds(viewer->GetBounds());
+			configList->SetModel(model.GetPointerOrNull());
+		}
+
 		void ClientChatWindow::ScrollBy(float delta) {
-			if (viewer)
+			// while the entry list replaces the history, the wheel scrolls the list
+			if (configList && viewer && !viewer->visible)
+				configList->MouseWheel(delta);
+			else if (viewer)
 				viewer->MouseWheel(delta);
 		}
 
 		void ClientChatWindow::UpdateState() {
 			if (field && sayButton)
 				sayButton->enable = field->GetText().size() > 0;
+			UpdateHints();
+		}
+
+		void ClientChatWindow::UpdateHints() {
+			if (!field || !hintSwitch)
+				return;
+
+			// Same rule as `CommandField::KeyDown`: Tab completes the name of a "/" word, and does
+			// nothing once the value is being typed. Otherwise it switches the channel.
+			TabHint hint = TabHint::Switch;
+			const std::string& text = field->GetText();
+			if (!text.empty() && text[0] == '/') {
+				if (text.find(' ') == std::string::npos)
+					hint = TabHint::Autocomplete;
+				else
+					hint = TabHint::None;
+			}
+
+			if (hint == tabHint)
+				return;
+			tabHint = hint;
+
+			if (hintKeys) {
+				// docked: the keys label is right aligned, so only its text changes
+				if (hint == TabHint::Autocomplete)
+					hintKeys->text = _Tr("Client", "[Tab] Autocomplete  [Enter] Send  [Esc] Cancel");
+				else
+					hintKeys->text = _Tr("Client", "[Enter] Send  [Esc] Cancel");
+				hintSwitch->visible = (hint == TabHint::Switch);
+				return;
+			}
+
+			// centered: the keys are on the buttons, so only the Tab hint changes
+			hintSwitch->visible = (hint != TabHint::None);
+			if (hint == TabHint::None)
+				return;
+
+			IFont* font = GetFont();
+			if (!font)
+				return;
+			if (hint == TabHint::Autocomplete)
+				hintSwitch->text = _Tr("Client", "[Tab] Autocomplete");
+			else
+				hintSwitch->text = _Tr("Client", "[Tab] Switch");
+			const AABB2 b = hintSwitch->GetBounds();
+			const float width = std::ceil(font->Measure(hintSwitch->text).x) + 2.0F;
+			hintSwitch->SetBounds(AABB2(b.min.x, b.min.y, width, b.max.y - b.min.y));
 		}
 
 		void ClientChatWindow::SetIsTeamChat(bool value) {
@@ -546,7 +989,8 @@ namespace spades {
 			if (mode == ChatWindowMode::Docked) {
 				r.DrawImage(nullptr, AABB2(pos.x + frameX + 8.0F, pos.y + headerSeparatorY,
 				                           frameW - 16.0F, 1.0F));
-				r.DrawImage(nullptr, AABB2(pos.x + frameX + 8.0F, pos.y + separatorY, frameW - 16.0F, 1.0F));
+				r.DrawImage(nullptr,
+				            AABB2(pos.x + frameX + 8.0F, pos.y + separatorY, frameW - 16.0F, 1.0F));
 			}
 		}
 

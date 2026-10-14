@@ -20,22 +20,56 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include <Gui/Utils/ConsoleCommandCandidate.h>
 #include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
+	namespace client {
+		class IFont;
+	}
 	namespace gui {
 		class ConsoleHelper;
 
-		/** Displays console command candidates below a `ConsoleCommandField`. */
+		/**
+		 * Displays console command candidates below a `ConsoleCommandField`. The box fits its content
+		 * but stays on the screen: a description that is too wide continues on the following rows, and
+		 * only the candidates that fit above the bottom edge are shown.
+		 */
 		class ConsoleCommandFieldCandidateView : public ui::UIElement {
+			/** One displayed row: the first one of a candidate also shows its name. */
+			struct Row {
+				size_t candidate = 0;
+				std::string text; // the part of the description shown in this row
+				bool first = false;
+				std::string head; // the part of the name that was already typed
+				std::string tail;
+				float headW = 0.0F;
+			};
+
 			std::vector<ConsoleCommandCandidate> candidates;
+			size_t prefixLength;
+			size_t extraCount; // matches that are not in `candidates`
+
+			// The layout is measured on the first frame and reused by every later one.
+			bool laidOut = false;
+			std::vector<Row> rows;
+			std::string moreText; // "+N more"; empty when every candidate is shown
+			float nameColumnW = 0.0F;
+			float boxW = 0.0F;
+
+			void BuildRows(client::IFont& font);
 
 		public:
+			/**
+			 * `prefixLength` is how many characters of each name the user already typed.
+			 * `extraCount` is how many more matches exist besides `candidates`.
+			 */
 			ConsoleCommandFieldCandidateView(ui::UIManager* manager,
-			                                 std::vector<ConsoleCommandCandidate> candidates);
+			                                 std::vector<ConsoleCommandCandidate> candidates,
+			                                 size_t prefixLength, size_t extraCount);
 			void Render() override;
 		};
 

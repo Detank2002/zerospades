@@ -20,6 +20,7 @@
 #include "Client.h"
 #include "NetClient.h"
 
+#include <Core/Strings.h>
 #include <Gui/Utils/ConsoleCommand.h>
 
 namespace spades {
@@ -28,10 +29,15 @@ namespace spades {
 			constexpr const char* CMD_SAVEMAP = "savemap";
 			constexpr const char* CMD_SETBLOCKCOLOR = "setblockcolor";
 
-			std::map<std::string, std::string> const g_clientCommands{
-			  {CMD_SAVEMAP, ": Save the current state of the map to the disk"},
-			  {CMD_SETBLOCKCOLOR, ": Set the block color (all values 0-255)"},
-			};
+			// Built on the first call, after the language is known, and reused afterwards. The
+			// candidate iterators keep a reference to it, so it must outlive them.
+			const std::map<std::string, std::string>& GetClientCommands() {
+				static const std::map<std::string, std::string> commands{
+				  {CMD_SAVEMAP, _Tr("Client", "Save the current state of the map to the disk")},
+				  {CMD_SETBLOCKCOLOR, _Tr("Client", "Set the block color (all values 0-255)")},
+				};
+				return commands;
+			}
 		} // namespace
 
 		bool Client::ExecCommand(const Handle<gui::ConsoleCommand>& cmd) {
@@ -61,7 +67,7 @@ namespace spades {
 
 		Handle<gui::ConsoleCommandCandidateIterator>
 		Client::AutocompleteCommandName(const std::string& name) {
-			return gui::MakeCandidates(g_clientCommands, name);
+			return gui::MakeCandidates(GetClientCommands(), name);
 		}
 	} // namespace client
 } // namespace spades

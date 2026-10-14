@@ -59,7 +59,7 @@ namespace spades {
 				    Handle<ConsoleCommandField>::New(manager, &history, helper);
 				field = f.GetPointerOrNull();
 				field->SetBounds(AABB2(10.0F, (height - 30.0F) - 8.0F, sw - 20.0F, 30.0F));
-				field->placeholder = _Tr("Console", "Command");
+				field->placeholder = _Tr("Console", "Type a command, e.g. help. Use Tab to autocomplete.");
 				field->maxLength = 128;
 				AddChild(field);
 			}
