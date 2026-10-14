@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "CTFGameMode.h"
 #include "Client.h"
@@ -50,6 +51,59 @@ namespace spades {
 		static const Vector4 spectatorIdColor = {210.0F / 255, 210.0F / 255, 210.0F / 255, 1}; // Grey
 		static const Vector4 spectatorTextColor = {220.0F / 255, 220.0F / 255, 0, 1}; // Goldish yellow
 		static const int spectatorTeamId = 255; // Spectators have a team id of 255
+
+		static const float spectatorGap = 4.0F;
+		static const float spectatorRowHeight = 20.0F;
+
+		struct SpectatorEntry {
+			int id;
+			std::string idText;
+			std::string name;
+			float idWidth;
+			float width; // id + spacing + name
+		};
+
+		// Gathers all spectators and measures how wide each one is
+		static std::vector<SpectatorEntry> CollectSpectators(World& world, IFont& font) {
+			std::vector<SpectatorEntry> result;
+			for (size_t i = 0; i < world.GetNumPlayerSlots(); i++) {
+				auto maybePlayer = world.GetPlayer(static_cast<unsigned int>(i));
+				if (!maybePlayer)
+					continue;
+				Player& player = maybePlayer.value();
+				if (player.GetTeamId() != spectatorTeamId)
+					continue;
+
+				SpectatorEntry ent;
+				ent.id = static_cast<int>(i);
+				ent.idText = "#" + ToString(ent.id);
+				ent.name = player.GetName();
+				ent.idWidth = font.Measure(ent.idText).x;
+				ent.width = ent.idWidth + 2.0F + font.Measure(ent.name).x;
+				result.push_back(ent);
+			}
+			return result;
+		}
+
+		// Greedy line wrapping. Returns the index of the first entry of each row.
+		static std::vector<size_t> BuildSpectatorRowStarts(const std::vector<SpectatorEntry>& entries,
+		                                                   float maxWidth) {
+			std::vector<size_t> starts;
+			float current = 0.0F;
+			for (size_t i = 0; i < entries.size(); i++) {
+				float w = entries[i].width;
+				if (starts.empty()) {
+					starts.push_back(i);
+					current = w;
+				} else if (current + spectatorGap + w > maxWidth) {
+					starts.push_back(i);
+					current = w;
+				} else {
+					current += spectatorGap + w;
+				}
+			}
+			return starts;
+		}
 
 		ScoreboardView::ScoreboardView(Client* c) : client(c), renderer(c->GetRenderer()) {
 			SPADES_MARK_FUNCTION();
@@ -180,7 +234,16 @@ namespace spades {
 			float playersBottom = playersTop + playersHeight;
 
 			bool areSpectatorsPresent = numSpectators > 0;
-			float spectatorsHeight = areSpectatorsPresent ? 64.0F : 0.0F;
+			float spectatorMaxWidth = contentsWidth - 40.0F;
+			float spectatorsHeight = 0.0F;
+			if (areSpectatorsPresent) {
+				IFont& specFont = client->fontManager->GetGuiFont();
+				auto specEntries = CollectSpectators(*world, specFont);
+				size_t specRows = BuildSpectatorRowStarts(specEntries, spectatorMaxWidth).size();
+				spectatorsHeight = 64.0F;
+				if (specRows > 1)
+					spectatorsHeight += (specRows - 1) * spectatorRowHeight;
+			}
 			float spectatorsBottom = playersBottom + spectatorsHeight;
 
 			// draw shadow
@@ -270,7 +333,7 @@ namespace spades {
 			DrawPlayers(0, contentsLeft, playersTop, contentsHalf, playersHeight);
 			DrawPlayers(1, (contentsLeft + contentsHalf) - 4.0F, playersTop, contentsHalf, playersHeight);
 			if (areSpectatorsPresent)
-				DrawSpectators(scrCenter.x, playersBottom);
+				DrawSpectators(scrCenter.x, playersBottom, spectatorMaxWidth);
 		}
 
 		struct ScoreboardEntry {
@@ -384,56 +447,40 @@ namespace spades {
 			}
 		}
 
-		void ScoreboardView::DrawSpectators(float centerX, float top) const {
+		void ScoreboardView::DrawSpectators(float centerX, float top, float maxWidth) const {
 			IFont& font = client->fontManager->GetGuiFont();
-			char buf[16];
-			
-			static const float xPixelSpectatorOffset = 20.0F;
-			float totalPixelWidth = 0;
 
-			int numSpectators = 0;
-			std::vector<ScoreboardEntry> entries;
-			for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
-				auto maybePlayer = world->GetPlayer(static_cast<unsigned int>(i));
-				if (!maybePlayer)
-					continue;
-				Player& player = maybePlayer.value();
-				if (player.GetTeamId() != spectatorTeamId)
-					continue;
-
-				ScoreboardEntry ent;
-				ent.name = player.GetName();
-				ent.id = static_cast<int>(i);
-				entries.push_back(ent);
-				numSpectators++;
-
-				// Measure total width in pixels so that we can center align all the spectators
-				snprintf(buf, sizeof(buf), "#%d", ent.id);
-				totalPixelWidth += font.Measure(buf).x + font.Measure(ent.name).x + xPixelSpectatorOffset;
-			}
-
-			if (numSpectators == 0)
+			auto entries = CollectSpectators(*world, font);
+			if (entries.empty())
 				return;
 
-			strcpy(buf, _TrN("Client", "Spectator{1}", "Spectators{1}", numSpectators, "").c_str());
+			std::string title = _TrN("Client", "Spectator{1}", "Spectators{1}", (int)entries.size(), "");
 
-			auto sizeSpecString = spectatorFont->Measure(buf);
-			Vector2 pos = MakeVector2(centerX, top + 10.0F) - sizeSpecString * 0.5F;
-			spectatorFont->Draw(buf, pos + MakeVector2(1, 2), 1.0F, MakeVector4(0, 0, 0, 0.5));
-			spectatorFont->Draw(buf, pos, 1.0F, spectatorTextColor);
+			auto sizeTitle = spectatorFont->Measure(title);
+			Vector2 pos = MakeVector2(centerX, top + 10.0F) - sizeTitle * 0.5F;
+			spectatorFont->Draw(title, pos + MakeVector2(1, 2), 1.0F, MakeVector4(0, 0, 0, 0.5));
+			spectatorFont->Draw(title, pos, 1.0F, spectatorTextColor);
 
-			float currentXoffset = centerX - totalPixelWidth * 0.5F;
-			float yOffset = pos.y + sizeSpecString.y + 10.0F;
+			auto rowStarts = BuildSpectatorRowStarts(entries, maxWidth);
+			float yOffset = pos.y + sizeTitle.y + 10.0F;
 
-			for (const auto& ent : entries) {
-				snprintf(buf, sizeof(buf), "#%d", ent.id);
-				font.Draw(buf, MakeVector2(currentXoffset, yOffset), 1.0F, spectatorIdColor);
+			for (size_t r = 0; r < rowStarts.size(); r++) {
+				size_t begin = rowStarts[r];
+				size_t end = (r + 1 < rowStarts.size()) ? rowStarts[r + 1] : entries.size();
 
-				auto sizeName = font.Measure(ent.name);
-				auto sizeID = font.Measure(buf);
-				font.Draw(ent.name, MakeVector2(currentXoffset + sizeID.x + 5.0F, yOffset), 1.0F, white);
+				// Measure this row so it can be centered on its own
+				float rowWidth = 0.0F;
+				for (size_t i = begin; i < end; i++)
+					rowWidth += entries[i].width + (i > begin ? spectatorGap : 0.0F);
 
-				currentXoffset += sizeID.x + sizeName.x + xPixelSpectatorOffset;
+				float x = centerX - rowWidth * 0.5F;
+				for (size_t i = begin; i < end; i++) {
+					const auto& ent = entries[i];
+					font.Draw(ent.idText, MakeVector2(x, yOffset), 1.0F, spectatorIdColor);
+					font.Draw(ent.name, MakeVector2(x + ent.idWidth + 2.0F, yOffset), 1.0F, white);
+					x += ent.width + spectatorGap;
+				}
+				yOffset += spectatorRowHeight;
 			}
 		}
 	} // namespace client
