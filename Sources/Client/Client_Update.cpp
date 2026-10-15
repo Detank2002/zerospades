@@ -1545,9 +1545,7 @@ namespace spades {
 				if (!isMeleeHit)
 					weaponStats.hits[by.GetWeaponType()]++;
 
-				// Not for teammates: with friendly fire off they take no damage, and
-				// the protocol does not say whether it is on. The grenade's damage
-				// numbers already skip them the same way.
+				// Not for teammates
 				if ((bool)cg_damageIndicators && !isMeleeHit &&
 				    (!by.IsTeammate(hurtPlayer) || world->IsModeFFA())) {
 					int dmg = by.GetWeapon().GetDamage(type);
