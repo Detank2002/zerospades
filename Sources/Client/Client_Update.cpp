@@ -660,17 +660,6 @@ namespace spades {
 				// sync secondary input from the ADS toggle state
 				if (isToggleADSMode)
 					winp.secondary = aimingDownSight;
-
-				// cancel ADS on fire
-				if (cg_autoUnscope && player.GetWeaponType() != SMG_WEAPON && winp.secondary) {
-					float nextFireTime = weapon.GetTimeToNextFire();
-					float timeSinceLastShot = weapon.GetDelay() - nextFireTime;
-					if (nextFireTime > 0.0F && timeSinceLastShot < 0.1F) {
-						if (isToggleADSMode)
-							aimingDownSight = false;
-						winp.secondary = false;
-					}
-				}
 			}
 
 			// set player input
@@ -898,6 +887,13 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			const int playerId = p.GetId();
+
+			// cancel ADS on fire (except for SMG)
+			if (p.IsLocalPlayer() && cg_autoUnscope
+				&& p.GetWeaponType() != SMG_WEAPON && p.IsZoomed()) {
+				weapInput.secondary = false;
+				aimingDownSight = false;
+			}
 
 			if (IsPlayerInFirstPerson(playerId)) {
 				localFireVibrationTime = time;
