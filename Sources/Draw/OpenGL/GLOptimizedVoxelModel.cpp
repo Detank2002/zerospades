@@ -972,7 +972,7 @@ namespace spades {
 			for (const auto& param : params) {
 				if (mirror && param.depthHack)
 					continue;
-				if (param.ghost)
+				if (param.ghost || !param.drawOutline)
 					continue;
 
 				const auto& modelMatrix = param.matrix;

@@ -48,6 +48,11 @@ namespace spades {
 
 			/** Specifies whether the model casts a shadow. */
 			bool castShadow = true;
+			
+			/**
+			 * Specifies whether an outline is drawn around the model.
+			 */
+			bool drawOutline = true;
 
 			/**
 			 * Specifies that the model is not an actual object in the virtual world, thus does not
