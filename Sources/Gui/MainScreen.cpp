@@ -165,9 +165,8 @@ namespace spades {
 			float sw = renderer->ScreenWidth();
 			float sh = renderer->ScreenHeight();
 
-			img = renderer->RegisterImage("Gfx/White.tga");
 			renderer->SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 1));
-			renderer->DrawImage(img, AABB2(0, 0, sw, sh));
+			renderer->DrawImage(nullptr, AABB2(0, 0, sw, sh));
 
 			img = renderer->RegisterImage("Gfx/Title/Logo.png");
 			size = {img->GetWidth(), img->GetHeight()};

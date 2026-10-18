@@ -46,7 +46,7 @@ namespace spades {
 			mask1 = renderer.RegisterImage("Gfx/LensFlare/mask1.png").Cast<GLImage>();
 			mask2 = renderer.RegisterImage("Gfx/LensFlare/mask2.png").Cast<GLImage>();
 			mask3 = renderer.RegisterImage("Gfx/LensFlare/mask3.png").Cast<GLImage>();
-			white = renderer.RegisterImage("Gfx/White.tga").Cast<GLImage>();
+			white = renderer.RegisterWhiteImage().Cast<GLImage>();
 		}
 
 		GLColorBuffer GLLensFlareFilter::Blur(GLColorBuffer buffer, float spread) {

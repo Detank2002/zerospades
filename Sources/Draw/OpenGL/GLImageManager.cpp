@@ -31,11 +31,15 @@ namespace spades {
 	namespace draw {
 		GLImageManager::GLImageManager(IGLDevice& dev) : device(dev), whiteImage(nullptr) {
 			SPADES_MARK_FUNCTION();
+
+			// Create the default white image right away
+			GetWhiteImage();
 		}
 
 		GLImageManager::~GLImageManager() {
 			SPADES_MARK_FUNCTION();
 			if (whiteImage) {
+				whiteImage->Invalidate();
 				whiteImage->Release();
 				whiteImage = nullptr;
 			}
@@ -47,6 +51,14 @@ namespace spades {
 
 		GLImage* GLImageManager::RegisterImage(const std::string& name) {
 			SPADES_MARK_FUNCTION();
+
+			// The default white image is built in memory. The legacy file name is
+			// kept as an alias so existing callers and mods keep working.
+			if (name == "*white" || name == "Gfx/White.tga") {
+				GLImage* white = GetWhiteImage();
+				white->AddRef();
+				return white;
+			}
 
 			auto it = images.find(name);
 			if (it == images.end()) {
@@ -60,8 +72,12 @@ namespace spades {
 		}
 
 		GLImage* GLImageManager::GetWhiteImage() {
-			if (!whiteImage)
-				whiteImage = RegisterImage("Gfx/White.tga");
+			if (!whiteImage) {
+				// Build the 1x1 white default image in memory.
+				Handle<Bitmap> bmp = Handle<Bitmap>::New(1, 1);
+				bmp->SetPixel(0, 0, 0xFFFFFFFF);
+				whiteImage = GLImage::FromBitmap(*bmp, &device).Unmanage();
+			}
 			return whiteImage;
 		}
 

@@ -179,7 +179,7 @@ namespace spades {
 			Vector3 velBias = {0, 0, -0.5F};
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			uint32_t col = IntVectorToColor(MakeIntVector3(127, 0, 0));
 			col = map->GetColorJit(col); // jit the colour
@@ -254,7 +254,7 @@ namespace spades {
 			}
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			Vector4 color = ConvertColorRGBA(col);
 
@@ -311,7 +311,7 @@ namespace spades {
 				return;
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			uint32_t col = map->GetColor(pos.x, pos.y, pos.z);
 			col = map->GetColorJit(col); // jit the colour
@@ -417,7 +417,7 @@ namespace spades {
 			}
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			uint32_t col = IntVectorToColor(MakeIntVector3(70, 70, 70));
 			col = map->GetColorJit(col); // jit the colour
@@ -500,7 +500,7 @@ namespace spades {
 			Vector3 velBias = {0, 0, -1.0F};
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			Vector4 color = MakeVector4(1, 1, 1, 0.6F);
 
@@ -577,7 +577,7 @@ namespace spades {
 			Vector3 velBias = {0, 0, -1.0F};
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			Vector4 color = MakeVector4(1, 1, 1, 0.6F);
 
@@ -633,7 +633,7 @@ namespace spades {
 				return;
 
 			// fragments
-			Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+			Handle<IImage> img = renderer->RegisterWhiteImage();
 
 			Vector4 color = MakeVector4(1, 1, 1, 0.9F);
 

@@ -254,11 +254,10 @@ namespace spades {
 			renderer.DrawImage(img, AABB2(0, spectatorsBottom + size.y, sw, -size.y));
 
 			// draw team bar
-			img = renderer.RegisterImage("Gfx/White.tga");
 			renderer.SetColorAlphaPremultiplied(AdjustColor(GetTeamColor(0), 0.8F, 0.3F));
-			renderer.DrawImage(img, AABB2(0, teamBarTop, scrCenter.x, teamBarHeight));
+			renderer.DrawImage(nullptr, AABB2(0, teamBarTop, scrCenter.x, teamBarHeight));
 			renderer.SetColorAlphaPremultiplied(AdjustColor(GetTeamColor(1), 0.8F, 0.3F));
-			renderer.DrawImage(img, AABB2(scrCenter.x, teamBarTop, scrCenter.x, teamBarHeight));
+			renderer.DrawImage(nullptr, AABB2(scrCenter.x, teamBarTop, scrCenter.x, teamBarHeight));
 
 			img = renderer.RegisterImage("Gfx/Scoreboard/Grunt.png");
 			size.x = 120.0F;

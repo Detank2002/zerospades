@@ -43,7 +43,6 @@ namespace spades {
 			std::vector<IImage*> images;
 			IRenderer* renderer;
 			FallbackFontManager* manager;
-			Handle<IImage> whiteImage; // used for last resort
 			bool roundSize;
 
 			struct FindResult {
@@ -122,12 +121,12 @@ namespace spades {
 				for (const auto& i : infos)
 					glyphs[i.unicode] = i;
 
-				// remove .ospfont and add .tga
+				// remove .ospfont and look for the atlas image (PNG preferred, TGA for legacy mods)
 				std::string p = path.substr(0, path.size() - 8);
-				imagePath = p + ".tga";
+				imagePath = p + ".png";
 				if (FileManager::FileExists(imagePath.c_str()))
 					return;
-				imagePath = p + ".png";
+				imagePath = p + ".tga";
 				if (FileManager::FileExists(imagePath.c_str()))
 					return;
 
@@ -168,7 +167,6 @@ namespace spades {
 				auto img = renderer->RegisterImage(imgPath.c_str()).Unmanage();
 				images.push_back(img);
 			}
-			whiteImage = renderer->RegisterImage("Gfx/White.tga");
 
 			// SW renderer doesn't perform linear interpolation on
 			// rendering images, so size rounding must be done to
@@ -212,11 +210,11 @@ namespace spades {
 
 			auto glyph = FindGlyph(unicode);
 			if (glyph.img == nullptr) { // no glyph found! draw box
-				const Handle<IImage>& img = whiteImage;
-				renderer->DrawImage(*img, AABB2(x, y, size, 1.0F));
-				renderer->DrawImage(*img, AABB2(x, y + size - 1.0F, size, 1.0F));
-				renderer->DrawImage(*img, AABB2(x, y + 1.0F, 1.0F, size - 2.0F));
-				renderer->DrawImage(*img, AABB2(x + size - 1.0F, y + 1.0F, 1.0F, size - 2.0F));
+				// A null image draws a solid fill using the shared white image.
+				renderer->DrawImage(nullptr, AABB2(x, y, size, 1.0F));
+				renderer->DrawImage(nullptr, AABB2(x, y + size - 1.0F, size, 1.0F));
+				renderer->DrawImage(nullptr, AABB2(x, y + 1.0F, 1.0F, size - 2.0F));
+				renderer->DrawImage(nullptr, AABB2(x + size - 1.0F, y + 1.0F, 1.0F, size - 2.0F));
 				return;
 			}
 

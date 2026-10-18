@@ -31,20 +31,19 @@ namespace spades {
 		class GLRenderer;
 
 		class GLImageManager {
-			IGLDevice &device;
-			std::map<std::string, GLImage *> images;
-			GLImage *whiteImage;
+			IGLDevice& device;
+			std::map<std::string, GLImage*> images;
+			GLImage* whiteImage;
 
-			GLImage *CreateImage(const std::string &);
+			GLImage* CreateImage(const std::string&);
 
 		public:
-			GLImageManager(IGLDevice &);
+			GLImageManager(IGLDevice&);
 			~GLImageManager();
 
-			GLImage *RegisterImage(const std::string &);
-			GLImage *GetWhiteImage();
-
 			void DrawAllImages(GLRenderer *);
+			GLImage* RegisterImage(const std::string&);
+			GLImage* GetWhiteImage();
 
 			void ClearCache();
 		};

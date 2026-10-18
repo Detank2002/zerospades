@@ -91,7 +91,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			m_font = m_renderer.RegisterImage("Gfx/Fonts/Debug.png");
-			m_white = m_renderer.RegisterImage("Gfx/White.tga");
+			m_white = m_renderer.RegisterWhiteImage();
 		}
 
 		GLProfiler::~GLProfiler() {

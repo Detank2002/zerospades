@@ -61,6 +61,7 @@ namespace spades {
 
 		class SWImageManager {
 			std::unordered_map<std::string, Handle<SWImage>> images;
+			Handle<SWImage> whiteImage;
 
 		public:
 			SWImageManager() {}
@@ -68,6 +69,7 @@ namespace spades {
 
 			Handle<SWImage> RegisterImage(const std::string &);
 			Handle<SWImage> CreateImage(Bitmap &);
+			Handle<SWImage> GetWhiteImage();
 
 			void ClearCache();
 		};

@@ -437,12 +437,11 @@ namespace spades {
 			Vector4 shadowColor = MakeVector4(0, 0, 0, 0.5);
 
 			// draw team bar
-			img = renderer->RegisterImage("Gfx/White.tga");
 			size.y = 2.0F;
 			renderer->SetColorAlphaPremultiplied(brightCol1);
-			renderer->DrawImage(img, AABB2(x - teamBarW, teamBarY, teamBarW, size.y));
+			renderer->DrawImage(nullptr, AABB2(x - teamBarW, teamBarY, teamBarW, size.y));
 			renderer->SetColorAlphaPremultiplied(brightCol2);
-			renderer->DrawImage(img, AABB2(x, teamBarY, teamBarW, size.y));
+			renderer->DrawImage(nullptr, AABB2(x, teamBarY, teamBarW, size.y));
 
 			// draw shadow
 			const float shadowSolid = 12.0F;
@@ -1988,16 +1987,14 @@ namespace spades {
 					float barY = y - barH;
 					float barPrg = std::max(1.0F, floorf(barW * hpFrac));
 
-					Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
-
 					// draw shadow
 					renderer->SetColorAlphaPremultiplied(shadowP);
-					renderer->DrawImage(img, AABB2(barX + 1, barY + 1, barW, barH));
+					renderer->DrawImage(nullptr, AABB2(barX + 1, barY + 1, barW, barH));
 
 					// draw background
 					if (hp < maxHealth) {
 						renderer->SetColorAlphaPremultiplied(bgColor);
-						renderer->DrawImage(img, AABB2(barX, barY, barW, barH));
+						renderer->DrawImage(nullptr, AABB2(barX, barY, barW, barH));
 
 						// draw damaged portion
 						if (fade > 0.0F) {
@@ -2007,14 +2004,14 @@ namespace spades {
 								float t = (x2 - barPrg) / dmgBarW;
 								float per = (1.0F - t * t) * fade;
 								renderer->SetColorAlphaPremultiplied(dmgColor * per);
-								renderer->DrawImage(img, AABB2(barX + x2, barY, 1.0F, barH));
+								renderer->DrawImage(nullptr, AABB2(barX + x2, barY, 1.0F, barH));
 							}
 						}
 					}
 
 					// draw health bar
 					renderer->SetColorAlphaPremultiplied(color + (white - color) * hurtTime);
-					renderer->DrawImage(img, AABB2(barX, barY, barPrg, barH));
+					renderer->DrawImage(nullptr, AABB2(barX, barY, barPrg, barH));
 
 					pos.y -= barH + 5.0F;
 				}

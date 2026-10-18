@@ -100,7 +100,7 @@ namespace spades {
 				}
 
 				if (cg_particles && distSqr < CASING_BOUNCE_DIST_SQ) {
-					Handle<IImage> img = renderer.RegisterImage("Gfx/White.tga");
+					Handle<IImage> img = renderer.RegisterWhiteImage();
 
 					Vector4 col = {1, 1, 1, 0.6F};
 					Vector3 pt = matrix.GetOrigin();

@@ -148,7 +148,7 @@ namespace spades {
 				if (distSqr < PARTICLE_BOUNCE_DIST_SQ && numBlocks < 512)
 					usePrecisePhysics = true;
 
-				Handle<IImage> img = renderer.RegisterImage("Gfx/White.tga");
+				Handle<IImage> img = renderer.RegisterWhiteImage();
 
 				auto* getRandom = SampleRandomFloat;
 

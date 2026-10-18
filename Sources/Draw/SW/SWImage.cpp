@@ -108,6 +108,11 @@ namespace spades {
 		SWImageManager::~SWImageManager() {}
 
 		Handle<SWImage> SWImageManager::RegisterImage(const std::string &name) {
+			// The default white image is built in memory. The legacy file name is
+			// kept as an alias so existing callers and mods keep working.
+			if (name == "*white" || name == "Gfx/White.tga")
+				return GetWhiteImage();
+
 			auto it = images.find(name);
 			if (it == images.end()) {
 				Handle<Bitmap> bitmap = Bitmap::Load(name);
@@ -117,6 +122,16 @@ namespace spades {
 			} else {
 				return it->second;
 			}
+		}
+
+		Handle<SWImage> SWImageManager::GetWhiteImage() {
+			if (!whiteImage) {
+				// Build the 1x1 white default image in memory.
+				Handle<Bitmap> bmp = Handle<Bitmap>::New(1, 1);
+				bmp->SetPixel(0, 0, 0xFFFFFFFF);
+				whiteImage = CreateImage(*bmp);
+			}
+			return whiteImage;
 		}
 
 		Handle<SWImage> SWImageManager::CreateImage(Bitmap &bitmap) {

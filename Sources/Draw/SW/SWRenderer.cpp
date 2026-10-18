@@ -71,11 +71,10 @@ namespace spades {
 
 			SPLog("creating image manager");
 			imageManager = std::make_shared<SWImageManager>();
-
+			
+			// Create the default white image right away
 			SPLog("creating white image");
-			Handle<Bitmap> whiteBmp = Handle<Bitmap>::New(1, 1);
-			whiteBmp->GetPixels()[0] = 0xFFFFFFFF;
-			whiteImage = Handle<SWImage>::New(*whiteBmp);
+			whiteImage = imageManager->GetWhiteImage();
 
 			SPLog("creating image renderer");
 			imageRenderer = std::make_shared<SWImageRenderer>(featureLevel);
@@ -135,6 +134,7 @@ namespace spades {
 			imageRenderer.reset();
 			flatMapRenderer.reset();
 
+			whiteImage = nullptr;
 			imageManager.reset();
 			modelManager.reset();
 			map = nullptr;

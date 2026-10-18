@@ -48,7 +48,7 @@ namespace spades {
 
 			/** Specifies whether the model casts a shadow. */
 			bool castShadow = true;
-			
+
 			/**
 			 * Specifies whether an outline is drawn around the model.
 			 */
@@ -145,6 +145,15 @@ namespace spades {
 
 			virtual Handle<IImage> CreateImage(Bitmap&) = 0;
 			virtual Handle<IModel> CreateModel(VoxelModel&) = 0;
+
+			/**
+			 * Returns a shared 1x1 opaque white image.
+			 *
+			 * The `*white` name follows the Quake 3 convention for images generated
+			 * by the engine instead of loaded from a file.
+			 * https://github.com/id-Software/Quake-III-Arena/blob/master/code/renderer/tr_image.c#L2094
+			 */
+			Handle<IImage> RegisterWhiteImage() { return RegisterImage("*white"); }
 
 			virtual void SetGameMap(stmp::optional<GameMap&>) = 0;
 			virtual void SetFogDistance(float) = 0;

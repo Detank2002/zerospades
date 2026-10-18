@@ -58,7 +58,7 @@ namespace spades {
 		                                     const GLDynamicLight& light, int texStage) {
 			// TODO: Raw pointers are not unique!
 			if (lastRenderer != renderer) {
-				whiteImage = renderer->RegisterImage("Gfx/White.tga").Cast<GLImage>();
+				whiteImage = renderer->RegisterWhiteImage().Cast<GLImage>();
 				lastRenderer = renderer;
 			}
 

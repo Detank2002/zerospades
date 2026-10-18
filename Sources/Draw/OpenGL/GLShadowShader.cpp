@@ -116,7 +116,7 @@ namespace spades {
 				dev->BindTexture(IGLDevice::Texture2D, renderer->mapShadowRenderer->GetTexture());
 			} else {
 				// TODO: do this case properly
-				auto img = renderer->RegisterImage("Gfx/White.tga").Cast<GLImage>();
+				auto img = renderer->RegisterWhiteImage().Cast<GLImage>();
 				img->Bind(IGLDevice::Texture2D);
 			}
 			mapShadowTexture.SetValue(texStage);
