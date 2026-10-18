@@ -41,7 +41,6 @@ namespace spades {
 			GLImageManager(IGLDevice&);
 			~GLImageManager();
 
-			void DrawAllImages(GLRenderer *);
 			GLImage* RegisterImage(const std::string&);
 			GLImage* GetWhiteImage();
 

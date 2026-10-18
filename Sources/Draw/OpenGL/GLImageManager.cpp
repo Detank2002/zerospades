@@ -88,31 +88,6 @@ namespace spades {
 			return GLImage::FromBitmap(*bmp, &device).Unmanage();
 		}
 
-		// draw all imaegs so that all textures are resident
-		// TODO: call this after all images are loaded
-		void GLImageManager::DrawAllImages(GLRenderer* r) {
-			if (images.empty())
-				return;
-
-			int count = (int)images.size();
-			int w = (int)ceil(sqrt((double)count)) + 1;
-			int h = (count + w - 1) / w;
-			float sw = r->ScreenWidth();
-			float sh = r->ScreenHeight();
-
-			int x = 0, y = 0;
-			for (auto it = images.begin(); it != images.end(); it++) {
-				GLImage* img = it->second;
-				r->DrawImage(img, AABB2(sw * (float)y / (float)w, sh * (float)y / (float)h,
-				                        1.0F / (float)w, 1.0F / (float)h));
-				x++;
-				if (x >= w) {
-					x = 0;
-					y++;
-				}
-			}
-		}
-
 		void GLImageManager::ClearCache() { images.clear(); }
 	} // namespace draw
 } // namespace spades
