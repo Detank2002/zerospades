@@ -540,7 +540,7 @@ namespace spades {
 				"Lets you use other alphabets and symbols (such as Cyrillic or Japanese) "
 				"in chat and in your name. When off, they are replaced by a placeholder."));
 			l.AddChoiceStringField(_Tr("Preferences", "Screenshot Format"), "cg_screenshotFormat",
-			                       {"PNG", "JPEG", "TGA"}, {"png", "jpeg", "tga"});
+			                       {"PNG", "JPEG"}, {"png", "jpeg"});
 			l.AddSliderField(_Tr("Preferences", "JPEG Quality"), "core_jpegQuality", 1, 100, 1,
 			                 NumberFormatter(0, "%"));
 			l.AddToggleField(_Tr("Preferences", "Enable Startup Window"), "cl_showStartupWindow");

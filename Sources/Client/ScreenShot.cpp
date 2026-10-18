@@ -34,13 +34,11 @@ DEFINE_SPADES_SETTING(cg_screenshotFormat, "jpeg");
 namespace spades {
 	namespace client {
 		namespace {
-			enum class ScreenshotFormat { JPG, TGA, PNG };
+			enum class ScreenshotFormat { JPG, PNG };
 
 			ScreenshotFormat GetScreenshotFormat(const std::string& format) {
 				if (EqualsIgnoringCase(format, "jpeg")) {
 					return ScreenshotFormat::JPG;
-				} else if (EqualsIgnoringCase(format, "tga")) {
-					return ScreenshotFormat::TGA;
 				} else if (EqualsIgnoringCase(format, "png")) {
 					return ScreenshotFormat::PNG;
 				} else {
@@ -57,14 +55,12 @@ namespace spades {
 				// editor share the Screenshots/ numbering and never rescan from zero.
 				static int nextScreenShotIndex = 0;
 
-				char bufJpg[32], bufTga[32], bufPng[32];
+				char bufJpg[32], bufPng[32];
 				const int maxShotIndex = 10000;
 				for (int i = 0; i < maxShotIndex; i++) {
 					snprintf(bufJpg, sizeof(bufJpg), "Screenshots/shot%04d.jpg", nextScreenShotIndex);
-					snprintf(bufTga, sizeof(bufTga), "Screenshots/shot%04d.tga", nextScreenShotIndex);
 					snprintf(bufPng, sizeof(bufPng), "Screenshots/shot%04d.png", nextScreenShotIndex);
 					if (FileManager::FileExists(bufJpg) ||
-						FileManager::FileExists(bufTga) ||
 						FileManager::FileExists(bufPng)) {
 						nextScreenShotIndex++;
 						if (nextScreenShotIndex >= maxShotIndex)
@@ -74,7 +70,6 @@ namespace spades {
 
 					switch (GetScreenshotFormat(cg_screenshotFormat)) {
 						case ScreenshotFormat::JPG: return bufJpg;
-						case ScreenshotFormat::TGA: return bufTga;
 						case ScreenshotFormat::PNG: return bufPng;
 					}
 					SPAssert(false);
