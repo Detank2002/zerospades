@@ -247,7 +247,7 @@ namespace spades {
 			float spectatorsBottom = playersBottom + spectatorsHeight;
 
 			// draw shadow
-			img = renderer.RegisterImage("Gfx/Scoreboard/TopShadow.tga");
+			img = renderer.RegisterImage("Gfx/Scoreboard/TopShadow.png");
 			size.y = 32.0F;
 			renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.2F));
 			renderer.DrawImage(img, AABB2(0, teamBarTop - size.y, sw, size.y));

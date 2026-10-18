@@ -596,7 +596,7 @@ namespace spades {
 				DrawGridLines(gridSize, inRect, gridCol);
 
 				// draw grid labels
-				Handle<IImage> mapFont = renderer.RegisterImage("Gfx/Fonts/MapFont.tga");
+				Handle<IImage> mapFont = renderer.RegisterImage("Gfx/Fonts/MapFont.png");
 				Vector4 labelCol = MakeVector4(1, 1, 1, 1) * 0.8F * alpha;
 				for (int i = 0; i < 8; i++) {
 					float startX = (float)i * gridSize.x;
