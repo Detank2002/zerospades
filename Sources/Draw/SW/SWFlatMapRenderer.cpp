@@ -30,19 +30,18 @@
 
 namespace spades {
 	namespace draw {
-		SWFlatMapRenderer::SWFlatMapRenderer(SWRenderer &r, Handle<client::GameMap> inMap)
+		SWFlatMapRenderer::SWFlatMapRenderer(SWRenderer& r, Handle<client::GameMap> inMap)
 		    : r(r), map(std::move(inMap)), w(map->Width()), h(map->Height()), needsUpdate(true) {
 			SPADES_MARK_FUNCTION();
 
-			if (w & 31) {
+			if (w & 31)
 				SPRaise("Map width must be a multiple of 32.");
-			}
 
 			img = Handle<SWImage>::New(map->Width(), map->Height());
 			updateMap.resize(w * h / 32);
-			std::fill(updateMap.begin(), updateMap.end(), 0xffffffff);
+			std::fill(updateMap.begin(), updateMap.end(), 0xFFFFFFFF);
 			updateMap2.resize(w * h / 32);
-			std::fill(updateMap2.begin(), updateMap2.end(), 0xffffffff);
+			std::fill(updateMap2.begin(), updateMap2.end(), 0xFFFFFFFF);
 
 			Update(true);
 		}
@@ -53,19 +52,23 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			{
 				std::lock_guard<std::mutex> lock(updateInfoLock);
-
 				if (!needsUpdate)
 					return;
 				needsUpdate = false;
 				updateMap.swap(updateMap2);
 				std::fill(updateMap.begin(), updateMap.end(), 0);
 			}
-			auto *outPixels = img->GetRawBitmap();
 
-			auto *mapRenderer = r.mapRenderer.get();
+			uint32_t* bitmap = img->GetRawBitmap();
+			// The pixel buffer rows are padded to a power of two, so the stride can be
+			// larger than the map width.
+			const int stride = img->GetRawWidth();
+
+			auto* mapRenderer = r.mapRenderer.get();
 
 			int idx = 0;
 			for (int y = 0; y < h; y++) {
+				uint32_t* outPixels = bitmap + y * stride;
 				for (int x = 0; x < w; x += 32) {
 					uint32_t upd = updateMap2[idx];
 					if (upd) {
@@ -96,8 +99,8 @@ namespace spades {
 			for (int z = 0; z < depth; z++) {
 				if (map->IsSolid(x, y, z)) {
 					uint32_t col = map->GetColor(x, y, z);
-					col = (col & 0xff00) | ((col & 0xff) << 16) | ((col & 0xff0000) >> 16);
-					col |= 0xff000000;
+					col = (col & 0xFF00) | ((col & 0xFF) << 16) | ((col & 0xFF0000) >> 16);
+					col |= 0xFF000000;
 					return col;
 				}
 			}

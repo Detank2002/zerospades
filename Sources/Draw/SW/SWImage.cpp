@@ -29,42 +29,53 @@ namespace spades {
 				unsigned int alpha = static_cast<unsigned int>(col >> 24);
 				alpha += (alpha >> 7); // [0,255] to [0,256]
 
-				unsigned int r = static_cast<unsigned int>((col >> 0) & 0xff);
-				unsigned int g = static_cast<unsigned int>((col >> 8) & 0xff);
-				unsigned int b = static_cast<unsigned int>((col >> 16) & 0xff);
+				unsigned int r = static_cast<unsigned int>((col >> 0) & 0xFF);
+				unsigned int g = static_cast<unsigned int>((col >> 8) & 0xFF);
+				unsigned int b = static_cast<unsigned int>((col >> 16) & 0xFF);
 				r = (r * alpha) >> 8;
 				g = (g * alpha) >> 8;
 				b = (b * alpha) >> 8;
 
-				col &= 0xff000000;
+				col &= 0xFF000000;
 				col |= b | (g << 8) | (r << 16); // swap RGB/BGR
 				return col;
 			}
+
+			inline int RoundUpToPowerOfTwo(int value) {
+				int result = 1;
+				while (result < value)
+					result <<= 1;
+				return result;
+			}
 		} // namespace
 
-		SWImage::SWImage(Bitmap &m)
+		SWImage::SWImage(Bitmap& m)
 		    : ew(m.GetWidth()),
 		      eh(m.GetHeight()),
+		      pw(RoundUpToPowerOfTwo(m.GetWidth())),
+		      ph(RoundUpToPowerOfTwo(m.GetHeight())),
 		      isWhite(false),
 		      w(static_cast<float>(m.GetWidth())),
 		      h(static_cast<float>(m.GetHeight())),
-		      iw(1.f / w),
-		      ih(1.f / h) {
-			bmp.resize(ew * eh);
+		      iw(1.0F / static_cast<float>(pw)),
+		      ih(1.0F / static_cast<float>(ph)) {
+			// The padding stays fully transparent.
+			bmp.assign(static_cast<std::size_t>(pw) * static_cast<std::size_t>(ph), 0);
 
 			// premultiplied alpha
 			{
-				uint32_t *inpix = m.GetPixels();
-				uint32_t *outpix = bmp.data();
 				bool foundNonWhite = false;
-				for (std::size_t i = ew * eh; i; i--) {
-					uint32_t col = *(inpix++);
-					col = ProcessPixel(col);
-					*(outpix++) = col;
-
-					if (col != 0xffffffff)
-						foundNonWhite = true;
+				for (int y = 0; y < eh; ++y) {
+					const uint32_t *inpix = m.GetPixels() + y * ew;
+					uint32_t *outpix = bmp.data() + y * pw;
+					for (int x = 0; x < ew; ++x) {
+						uint32_t col = ProcessPixel(*(inpix++));
+						*(outpix++) = col;
+						if (col != 0xFFFFFFFF)
+							foundNonWhite = true;
+					}
 				}
+				// Only the exact area counts here, the padding is always transparent.
 				isWhite = !foundNonWhite;
 			}
 		}
@@ -72,33 +83,31 @@ namespace spades {
 		SWImage::SWImage(int w, int h)
 		    : ew(w),
 		      eh(h),
+		      pw(RoundUpToPowerOfTwo(w)),
+		      ph(RoundUpToPowerOfTwo(h)),
 		      isWhite(false),
 		      w(static_cast<float>(ew)),
 		      h(static_cast<float>(eh)),
-		      iw(1.f / w),
-		      ih(1.f / h) {
-			bmp.reserve(ew * eh);
+		      iw(1.0F / static_cast<float>(pw)),
+		      ih(1.0F / static_cast<float>(ph)) {
+			bmp.resize(static_cast<std::size_t>(pw) * static_cast<std::size_t>(ph));
 		}
 
 		SWImage::~SWImage() {}
 
-		void SWImage::Update(Bitmap &inBmp, int x, int y) {
+		void SWImage::Update(Bitmap& inBmp, int x, int y) {
 			SPADES_MARK_FUNCTION();
-			if (x < 0 || y < 0 || x + inBmp.GetWidth() > ew || y + inBmp.GetHeight() > eh) {
+			if (x < 0 || y < 0 || x + inBmp.GetWidth() > ew || y + inBmp.GetHeight() > eh)
 				SPRaise("Out of range.");
-			}
 
 			{
 				int bw = inBmp.GetWidth();
 				int bh = inBmp.GetHeight();
 				for (int yy = 0; yy < bh; ++yy) {
-					uint32_t *inpix = inBmp.GetPixels();
-					uint32_t *outpix = bmp.data();
-					outpix += x + (y + yy) * ew;
-					inpix += yy * bw;
-					for (unsigned int j = bw; j; --j) {
+					uint32_t* inpix = inBmp.GetPixels() + yy * bw;
+					uint32_t* outpix = bmp.data() + x + (y + yy) * pw;
+					for (int j = bw; j; --j)
 						*(outpix++) = ProcessPixel(*(inpix++));
-					}
 				}
 			}
 
@@ -107,7 +116,7 @@ namespace spades {
 
 		SWImageManager::~SWImageManager() {}
 
-		Handle<SWImage> SWImageManager::RegisterImage(const std::string &name) {
+		Handle<SWImage> SWImageManager::RegisterImage(const std::string& name) {
 			// The default white image is built in memory. The legacy file name is
 			// kept as an alias so existing callers and mods keep working.
 			if (name == "*white" || name == "Gfx/White.tga")
@@ -134,7 +143,7 @@ namespace spades {
 			return whiteImage;
 		}
 
-		Handle<SWImage> SWImageManager::CreateImage(Bitmap &bitmap) {
+		Handle<SWImage> SWImageManager::CreateImage(Bitmap& bitmap) {
 			return Handle<SWImage>::New(bitmap);
 		}
 

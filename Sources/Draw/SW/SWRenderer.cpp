@@ -71,7 +71,7 @@ namespace spades {
 
 			SPLog("creating image manager");
 			imageManager = std::make_shared<SWImageManager>();
-			
+
 			// Create the default white image right away
 			SPLog("creating white image");
 			whiteImage = imageManager->GetWhiteImage();
@@ -761,20 +761,23 @@ namespace spades {
 						auto x3 = trans(-1, 1);
 						auto x4 = trans(1, 1);
 
+						// The UV range of the image itself, excluding the power-of-two padding
+						const Vector2 uvMax = spr.img->GetUVScale();
+
 						SWImageRenderer::Vertex v1, v2, v3;
 						v1.color = v2.color = v3.color = spr.color;
 						v1.uv = MakeVector2(0, 0);
 						v1.position = x1;
-						v2.uv = MakeVector2(1, 0);
+						v2.uv = MakeVector2(uvMax.x, 0);
 						v2.position = x2;
-						v3.uv = MakeVector2(0, 1);
+						v3.uv = MakeVector2(0, uvMax.y);
 						v3.position = x3;
 						imageRenderer->DrawPolygon(spr.img.GetPointerOrNull(), v1, v2, v3);
-						v1.uv = MakeVector2(1, 0);
+						v1.uv = MakeVector2(uvMax.x, 0);
 						v1.position = x2;
-						v2.uv = MakeVector2(1, 1);
+						v2.uv = MakeVector2(uvMax.x, uvMax.y);
 						v2.position = x4;
-						v3.uv = MakeVector2(0, 1);
+						v3.uv = MakeVector2(0, uvMax.y);
 						v3.position = x3;
 						imageRenderer->DrawPolygon(spr.img.GetPointerOrNull(), v1, v2, v3);
 					}
