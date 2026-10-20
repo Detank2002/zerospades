@@ -38,6 +38,8 @@
 #include <Core/Settings.h>
 #include <Core/TMPUtils.h>
 
+#include <Client/FontData.h>
+
 namespace chrono = std::chrono;
 
 namespace spades {
@@ -51,6 +53,31 @@ namespace spades {
 			double GetWallClockTime() {
 				auto duration = chrono::high_resolution_clock::now() - startTimePoint;
 				return chrono::duration_cast<chrono::milliseconds>(duration).count() / 1000000.0;
+			}
+			
+			// 16x16 grid of 6x10 cells: the 6x8 glyph on top, over a semi-transparent
+			// dark background that fills the whole cell.
+			Handle<Bitmap> BuildProfilerFontAtlas() {
+				constexpr int kCellW = 6;
+				constexpr int kCellH = 10;
+				constexpr int kGlyphH = 8;
+
+				Handle<Bitmap> bitmap = Handle<Bitmap>::New(16 * kCellW, 16 * kCellH);
+				uint32_t* pixels = bitmap->GetPixels();
+
+				for (int glyph = 0; glyph < 256; glyph++) {
+					const int originX = (glyph % 16) * kCellW;
+					const int originY = (glyph / 16) * kCellH;
+					for (int y = 0; y < kCellH; y++) {
+						for (int x = 0; x < kCellW; x++) {
+							const bool set = y < kGlyphH &&
+								client::fontdata::IsFont6x8PixelSet(glyph, x, y);
+							pixels[(originY + y) * (16 * kCellW) + originX + x] =
+								set ? 0xFFFFFFFFU : 0xCC000000U; // 0xCC = 80% alpha
+						}
+					}
+				}
+				return bitmap;
 			}
 		} // namespace
 
@@ -90,7 +117,7 @@ namespace spades {
 		      m_waitingTimerQueryResult{false} {
 			SPADES_MARK_FUNCTION();
 
-			m_font = m_renderer.RegisterImage("Gfx/Fonts/Debug.png");
+			m_font = m_renderer.CreateImage(*BuildProfilerFontAtlas());
 			m_white = m_renderer.RegisterWhiteImage();
 		}
 
@@ -468,11 +495,10 @@ namespace spades {
 							}
 							cursor.x = column * 500.0F;
 						} else {
-							int col = c & 15;
-							int row = (c >> 4) - 2;
+							const unsigned char uc = static_cast<unsigned char>(c);
 							renderer.DrawImage(font, cursor,
-							                   AABB2{col * 6.0f, row * 10.0f, 6.0f, 10.0f});
-							cursor.x += 6.0f;
+								AABB2{(uc & 15) * 6.0F, (uc >> 4) * 10.0F, 6.0F, 10.0F});
+							cursor.x += 6.0F;
 						}
 						++str;
 					}

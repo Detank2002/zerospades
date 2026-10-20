@@ -21,10 +21,16 @@
 #include <memory>
 #include <regex>
 
+#include <utility>
+#include <vector>
+
 #include "FTFont.h"
+#include "FontData.h"
 #include "Fonts.h"
 #include "IRenderer.h"
 #include "Quake3Font.h"
+#include <Core/Bitmap.h>
+#include <Core/CP437.h>
 #include <Core/FileManager.h>
 
 namespace spades {
@@ -33,13 +39,12 @@ namespace spades {
 			std::regex const g_fontNameRe(".*\\.(?:otf|ttf|ttc)", std::regex::icase);
 
 			struct GlobalFontInfo {
-				std::shared_ptr<ngclient::FTFontSet> squareFontSet, guiFontSet, sysFontSet;
+				std::shared_ptr<ngclient::FTFontSet> squareFontSet, guiFontSet;
 
 				GlobalFontInfo() {
 					SPLog("Loading built-in fonts");
 					LoadFontSet(squareFontSet, "Gfx/Fonts/SquareFont.ttf", "SquareFont");
 					LoadFontSet(guiFontSet, "Gfx/Fonts/OpenSans.ttf", "Open Sans");
-					LoadFontSet(sysFontSet, "Gfx/Fonts/smallfnt68.ttf", "SmallFont");
 
 					// Preliminary custom font support
 					auto files = FileManager::EnumFiles("Fonts");
@@ -70,6 +75,46 @@ namespace spades {
 					return instance;
 				}
 			};
+
+			// The bitmap fonts are 16x16 grids of cells ordered by code page 437. Their pixel
+			// data is embedded in FontData.h, so there is no image file to load.
+			Handle<IFont> CreateBitmapFont(IRenderer* renderer, Handle<Bitmap> source, fontdata::CellSize cell) {
+				// Quake3Font reads 4 ints per glyph (x, y, width, advance), indexed by Unicode
+				// code point. A width of -1 marks the glyph as missing.
+				std::vector<int> map(256 * 4, 0);
+				for (int i = 0; i < 256; i++)
+					map[i * 4 + 2] = -1;
+
+				auto setGlyph = [&](int codePoint, int cellIndex) {
+					int* e = &map[codePoint * 4];
+					e[0] = (cellIndex % 16) * cell.width;
+					e[1] = (cellIndex / 16) * cell.height;
+					e[2] = cell.width;
+					e[3] = cell.width;
+				};
+
+				for (int c = 33; c <= 126; c++)
+					setGlyph(c, c);
+
+				// The space is handled as a gap of `spaceWidth` instead of an image.
+				setGlyph(32, 32);
+				map[32 * 4 + 3] = PROP_SPACE_WIDTH;
+
+				// Latin-1 code points that have a glyph in code page 437. The bitmap font is
+				// indexed by Unicode code point (< 256), so anything above that is unreachable.
+				for (int cell = 128; cell < 256; cell++) {
+					const uint32_t codePoint = CP437::DecodeChar(static_cast<char>(cell));
+					if (codePoint >= 128 && codePoint < 256)
+						setGlyph(static_cast<int>(codePoint), cell);
+				}
+
+				Handle<IImage> img = renderer->CreateImage(*source);
+
+				// The font keeps `source`: its pixel data is needed to generate the outline atlas.
+				return Handle<Quake3Font>::New(renderer, img.GetPointerOrNull(),
+					source.GetPointerOrNull(), map.data(),
+					cell.height, static_cast<float>(cell.width), true).Cast<IFont>();
+			}
 		} // namespace
 
 		FontManager::FontManager(IRenderer* renderer) {
@@ -83,7 +128,9 @@ namespace spades {
 			// 12px gui face with line height == em height: Measure() then reports the true
 			// glyph extent instead of the padded line box, so vertical centering is tight.
 			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 12.0F).Cast<IFont>();
-			smallFont = Handle<ngclient::FTFont>::New(renderer, instance.sysFontSet, 8.0F, 10.0F).Cast<IFont>();
+
+			// bitmap fonts
+			smallFont = CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8Cell);
 		}
 
 		FontManager::~FontManager() {}
