@@ -1016,6 +1016,8 @@ namespace spades {
 				if (leftHandSqr > 0.01F || rightHandSqr > 0.01F) {
 					Handle<IModel> armModel = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
 					Handle<IModel> upperModel = renderer.RegisterModel((modelPath + "UpperArm.kv6").c_str());
+					Handle<IModel> armRightModel = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
+					Handle<IModel> upperRightModel = renderer.RegisterModel((modelPath + "UpperArmRight.kv6").c_str());
 
 					// manual adjustment
 					Vector3 trans = MakeVector3(0, 0, 0);
@@ -1032,7 +1034,7 @@ namespace spades {
 					const float armlenSqr = armlen * armlen;
 					const Matrix4 armsScale = Matrix4::Scale(0.05F);
 
-					auto getArmMatrix = [&](const Vector3& v1, const Vector3& v2, bool isLeftArm) {
+					auto getArmMatrix = [&](const Vector3& v1, const Vector3& v2) {
 						Vector3 axes[3];
 						axes[2] = (v1 - v2).Normalize();
 						axes[1] = Vector3::Cross(axes[2], MakeVector3(0, 0, 1)).Normalize();
@@ -1040,12 +1042,7 @@ namespace spades {
 						Matrix4 mat = Matrix4::FromAxis(axes[0], axes[1], axes[2], v2);
 						if (leftHanded)
 							mat = Matrix4::Scale(-1, 1, 1) * mat;
-						mat = eyeMatrix * mat * armsScale;
-						if (isLeftArm) {
-							mat = mat * Matrix4::Translate(0, -1, 0);
-							mat = mat * Matrix4::Scale(1, -1, 1);
-						}
-						return mat;
+						return eyeMatrix * mat * armsScale;
 					};
 
 					auto renderArm = [&](int i) {
@@ -1064,12 +1061,12 @@ namespace spades {
 						const bool isLeftArm = leftHanded ? (i != 0) : (i == 0);
 
 						// draw arm
-						param.matrix = getArmMatrix(hand, elbow, isLeftArm);
-						renderer.RenderModel(*armModel, param);
+						param.matrix = getArmMatrix(hand, elbow);
+						renderer.RenderModel(isLeftArm ? *armModel : *armRightModel, param);
 
 						// draw upper arm
-						param.matrix = getArmMatrix(elbow, shoulder, isLeftArm);
-						renderer.RenderModel(*upperModel, param);
+						param.matrix = getArmMatrix(elbow, shoulder);
+						renderer.RenderModel(isLeftArm ? *upperModel : *upperRightModel, param);
 					};
 
 					if (leftHandSqr > 0.01F)

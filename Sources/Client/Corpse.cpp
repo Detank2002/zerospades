@@ -566,8 +566,6 @@ namespace spades {
 
 			// Arms
 			{
-				model = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
-
 				const Vector3 arm1Base = (torso * MakeVector3(0.4F, 0.0F, 0.1F)).GetXYZ();
 				const Vector3 arm2Base = (torso * MakeVector3(-0.4F, 0.0F, 0.1F)).GetXYZ();
 
@@ -575,18 +573,19 @@ namespace spades {
 					* Matrix4::Scale(0.75F, 0.75F, 1.0F)
 					* Matrix4::Scale(-1, -1, 1);
 
+				model = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
 				Vector3 aX, aY, aZ;
 				aZ = (nodes[Arm1].pos - nodes[Torso1].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aX, aY, aZ, arm1Base) * armsScale;
+				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm1Base) * armsScale;
 				renderer.RenderModel(*model, param);
 
+				model = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
 				aZ = (nodes[Arm2].pos - nodes[Torso2].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aX, aY, aZ, arm2Base) * armsScale
-					* Matrix4::Scale(-1, 1, 1); // mirror
+				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm2Base) * armsScale;
 				renderer.RenderModel(*model, param);
 			}
 
