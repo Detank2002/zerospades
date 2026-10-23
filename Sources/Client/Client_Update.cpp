@@ -1209,6 +1209,7 @@ namespace spades {
 				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
 				AudioParam param;
 				param.volume = cg_deathSoundGain;
+				param.pitch = victim.IsZombie() ? 0.5F : 1.0F;
 				audioDevice->PlayLocal(c.GetPointerOrNull(), param);
 
 				// reset hit counter
@@ -1240,7 +1241,9 @@ namespace spades {
 					Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
 
 					AudioParam param;
-					param.pitch = 0.9F + 0.2F * SampleRandomFloat();
+					param.pitch = victim.IsZombie()
+						? (0.55F + 0.2F * SampleRandomFloat())
+						: (0.9F + 0.2F * SampleRandomFloat());
 					param.referenceDistance = 5.0F;
 					audioDevice->Play(c.GetPointerOrNull(), victim.GetEye(), param);
 				}
