@@ -145,6 +145,9 @@ namespace spades {
 			std::string GetTeamName(int t) { return GetTeam(t).name; }
 			IntVector3 GetTeamColor(int t) { return GetTeam(t).color; }
 
+			/** Returns true if the team is a zombie team, i.e. its name is "Zombie" or "Zombies" (case-insensitive). */
+			bool IsTeamZombie(int t);
+
 			bool IsModeFFA();
 
 			PlayerPersistent& GetPlayerPersistent(int index);

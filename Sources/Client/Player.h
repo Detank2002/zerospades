@@ -156,6 +156,8 @@ namespace spades {
 			int GetTeamId() { return teamId; }
 			bool IsTeammate(Player& p) { return teamId == p.teamId; }
 			bool IsSpectator() { return teamId >= 2; }
+			/** Returns true if this player belongs to a zombie team (see `World::IsZombieTeam`). */
+			bool IsZombie();
 			std::string GetTeamName();
 			std::string GetName();
 			int GetScore();

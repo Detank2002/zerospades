@@ -1452,6 +1452,7 @@ namespace spades {
 			weapInput = WeaponInput();
 		}
 
+		bool Player::IsZombie() { return world.IsTeamZombie(teamId); }
 		std::string Player::GetTeamName() { return world.GetTeamName(teamId); }
 		std::string Player::GetName() { return world.GetPlayerName(playerId); }
 		int Player::GetScore() { return world.GetPlayerScore(playerId); }

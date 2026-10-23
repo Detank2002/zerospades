@@ -479,6 +479,16 @@ namespace spades {
 			return nullptr;
 		}
 
+		bool World::IsTeamZombie(int t) {
+			// Only playable teams can be zombies
+			if (t < 0 || t > 1)
+				return false;
+
+			// case-insensitive comparison, ignoring surrounding whitespace
+			const std::string name = ToLowerCase(TrimSpaces(GetTeamName(t)));
+			return name == "zombie" || name == "zombies";
+		}
+
 		bool World::IsModeFFA() {
 			if (gameProperties->isGameModeFFA)
 				return true; // if this fails we check for color matching
