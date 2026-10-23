@@ -558,6 +558,7 @@ namespace spades {
 			renderer->RegisterModel("Models/MapObjects/CheckPoint.kv6");
 			renderer->RegisterModel("Models/MapObjects/Intel.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/Arm.kv6");
+			renderer->RegisterModel("Models/Player/Rifle/ArmRight.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/Arms.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/Leg.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/LegCrouch.kv6");
@@ -568,7 +569,9 @@ namespace spades {
 			renderer->RegisterModel("Models/Player/Rifle/Dead.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/Head.kv6");
 			renderer->RegisterModel("Models/Player/Rifle/UpperArm.kv6");
+			renderer->RegisterModel("Models/Player/Rifle/UpperArmRight.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/Arm.kv6");
+			renderer->RegisterModel("Models/Player/Shotgun/ArmRight.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/Arms.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/Dead.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/Head.kv6");
@@ -579,7 +582,9 @@ namespace spades {
 			renderer->RegisterModel("Models/Player/Shotgun/Torso.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/TorsoCrouch.kv6");
 			renderer->RegisterModel("Models/Player/Shotgun/UpperArm.kv6");
+			renderer->RegisterModel("Models/Player/Shotgun/UpperArmRight.kv6");
 			renderer->RegisterModel("Models/Player/SMG/Arm.kv6");
+			renderer->RegisterModel("Models/Player/SMG/ArmRight.kv6");
 			renderer->RegisterModel("Models/Player/SMG/Arms.kv6");
 			renderer->RegisterModel("Models/Player/SMG/Dead.kv6");
 			renderer->RegisterModel("Models/Player/SMG/Head.kv6");
@@ -590,7 +595,9 @@ namespace spades {
 			renderer->RegisterModel("Models/Player/SMG/Torso.kv6");
 			renderer->RegisterModel("Models/Player/SMG/TorsoCrouch.kv6");
 			renderer->RegisterModel("Models/Player/SMG/UpperArm.kv6");
+			renderer->RegisterModel("Models/Player/SMG/UpperArmRight.kv6");
 			renderer->RegisterModel("Models/Player/Arm.kv6");
+			renderer->RegisterModel("Models/Player/ArmRight.kv6");
 			renderer->RegisterModel("Models/Player/Arms.kv6");
 			renderer->RegisterModel("Models/Player/Dead.kv6");
 			renderer->RegisterModel("Models/Player/Head.kv6");
@@ -601,6 +608,7 @@ namespace spades {
 			renderer->RegisterModel("Models/Player/Torso.kv6");
 			renderer->RegisterModel("Models/Player/TorsoCrouch.kv6");
 			renderer->RegisterModel("Models/Player/UpperArm.kv6");
+			renderer->RegisterModel("Models/Player/UpperArmRight.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Pickaxe.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Spade.kv6");
 			renderer->RegisterModel("Models/Weapons/Block/Block.kv6");
