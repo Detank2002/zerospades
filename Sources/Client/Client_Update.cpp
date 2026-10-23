@@ -1235,6 +1235,16 @@ namespace spades {
 					audioDevice->Play(c.GetPointerOrNull(), victim.GetEye(), param);
 				}
 
+				// play death sound for non local player
+				if (!IsMuted()) {
+					Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
+
+					AudioParam param;
+					param.pitch = 0.9F + 0.2F * SampleRandomFloat();
+					param.referenceDistance = 5.0F;
+					audioDevice->Play(c.GetPointerOrNull(), victim.GetEye(), param);
+				}
+
 				// register local kills
 				if (killer.IsLocalPlayer()) {
 					curKills++;
