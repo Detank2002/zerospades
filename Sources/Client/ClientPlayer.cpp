@@ -674,6 +674,15 @@ namespace spades {
 			return axes;
 		}
 
+		std::string ClientPlayer::GetModelPath() {
+			std::string modelPath = "Models/Player/";
+			if (player.IsZombie())
+				modelPath += "Zombie/";
+			else if (!cg_classicPlayerModels)
+				modelPath += player.GetWeapon().GetName() + "/";
+			return modelPath;
+		}
+
 		void ClientPlayer::AddToSceneFirstPersonView() {
 			Player& p = player;
 			Weapon& w = p.GetWeapon();
@@ -681,9 +690,7 @@ namespace spades {
 			Matrix4 eyeMatrix = GetEyeMatrix();
 			Vector3 vel = p.GetVelocity();
 
-			std::string modelPath = "Models/Player/";
-			if (!cg_classicPlayerModels)
-				modelPath += w.GetName() + "/";
+			std::string modelPath = GetModelPath();
 
 			const Vector3 origin = eyeMatrix.GetOrigin();
 
@@ -965,7 +972,7 @@ namespace spades {
 				* Matrix4::Translate(-legsPosX, legsPosY, -legsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), -legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), -legsRot.y);
-				
+
 			Matrix4 const legRight = lower
 				* Matrix4::Translate(legsPosX, legsPosY, -legsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), legsRot.x)
@@ -1085,9 +1092,7 @@ namespace spades {
 			IRenderer& renderer = client.GetRenderer();
 			World* world = client.GetWorld();
 
-			std::string modelPath = "Models/Player/";
-			if (!cg_classicPlayerModels)
-				modelPath += w.GetName() + "/";
+			std::string modelPath = GetModelPath();
 
 			Vector3 o = p.GetFront(cg_orientationSmoothing); // interpolated
 			Vector3 front2D = MakeVector3(o.x, o.y, 0).Normalize();
@@ -1207,7 +1212,7 @@ namespace spades {
 				* Matrix4::Translate(-legsPosX, legsPosY, -legsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), -legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), -legsRot.y);
-				
+
 			Matrix4 const legRight = lower
 				* Matrix4::Translate(legsPosX, legsPosY, -legsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), legsRot.x)

@@ -45,6 +45,7 @@ namespace spades {
 			color = ConvertColorRGB(p.GetColor());
 			weaponName = p.GetWeapon().GetName();
 			isLocalPlayer = p.IsLocalPlayer();
+			isZombiePlayer = p.IsZombie();
 
 			Vector3 o = p.GetFront();
 
@@ -521,7 +522,9 @@ namespace spades {
 			param.customColor = color;
 
 			std::string modelPath = "Models/Player/";
-			if (!cg_classicPlayerModels)
+			if (isZombiePlayer)
+				modelPath += "Zombie/";
+			else if (!cg_classicPlayerModels)
 				modelPath += weaponName + "/";
 
 			const Matrix4 scaler = Matrix4::Scale(0.1F);

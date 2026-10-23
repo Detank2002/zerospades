@@ -76,6 +76,13 @@ namespace spades {
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
 			std::array<Vector3, 3> GetFlashlightAxes();
+
+			/**
+			 * Get the base path of the player model set to use for this player.
+			 * Zombies use a dedicated model set, everyone else uses the regular one.
+			 */
+			std::string GetModelPath();
+
 			void AddToSceneThirdPersonView();
 			void AddToSceneFirstPersonView();
 
@@ -86,7 +93,7 @@ namespace spades {
 			AmbienceInfo ComputeAmbience();
 
 			// TODO: Naming convention violation
-			asIScriptObject* initScriptFactory(ScriptFunction& creator, 
+			asIScriptObject* initScriptFactory(ScriptFunction& creator,
 				IRenderer& renderer, IAudioDevice& audio);
 
 		protected:

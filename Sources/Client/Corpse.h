@@ -66,6 +66,7 @@ namespace spades {
 			Vector3 color;
 			std::string weaponName;
 			bool isLocalPlayer;
+			bool isZombiePlayer;
 			bool isChristmasOn;
 
 			Node nodes[NodeCount];
