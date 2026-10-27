@@ -37,6 +37,7 @@
 #include "IWorldListener.h"
 #include "MumbleLink.h"
 #include "NoiseSampler.h"
+#include "PieMenu.h"
 #include "Player.h"
 #include <Core/Math.h>
 #include <Core/ServerAddress.h>
@@ -175,6 +176,10 @@ namespace spades {
 
 			// pie menu
 			std::unique_ptr<PieMenuView> pieMenuView;
+			/** The menu the server sent last, which replaces the client's own
+			 * entirely. It takes effect on the next open: the view keeps its own copy
+			 * of the rings on show, so a ring never changes under a held thumb. */
+			stmp::optional<PieMenu> serverPieMenu;
 
 			// unified cursor used by all UI overlays
 			std::unique_ptr<gui::SoftwareCursor> cursor;
@@ -589,7 +594,18 @@ namespace spades {
 
 			// Opens the pie menu on the ring set the crosshair calls for. The context
 			// is resolved once, here, and then stays put for as long as the menu is up.
-			void OpenPieMenu();
+			/** Returns whether the menu opened. */
+			bool OpenPieMenu();
+			/** Sends what a chosen slice sends. `targetPlayerId` is the player aimed
+			 * at when the menu opened, or `-1`. */
+			void CommitPieSlice(const PieSlice&, int targetPlayerId);
+			/** Whether the menu would open on the spectator context. */
+			bool IsSpectatingForPieMenu();
+			/** The player the drawn camera looks out of, whom a ray from it must not
+			 * meet. */
+			stmp::optional<int> ViewExcludedPlayerId();
+			/** Whether the menu on show opened on the spectator context. */
+			bool pieMenuSpectating = false;
 			void DrawDamageIndicators();
 
 			// ── Teamplay ───────────────────────────────────────────
@@ -657,20 +673,15 @@ namespace spades {
 			 * when the ray hits nothing usable. */
 			bool ResolveCrosshairWorldPos(Vector3& out);
 
-			/** Sends a ping when the server's feature bits allow it and the local player
-			 * is alive. Returns whether it was sent, so a caller with something else to
-			 * say can fall back to it. */
-			bool SendTeamplayPing(const Vector3& position, const std::string& reason);
-
 			/** Sends a neutral ping at whatever the crosshair points at. Bound to a key;
 			 * reports why nothing happened when the server does not allow pings. */
 			void SendTeamplayPingAtCrosshair();
 
-			/** Where the pie menu will ping, frozen when it opens. The menu takes the
-			 * mouse for itself, but the player can still move, so resolving the target
-			 * again on release would drift away from what they were pointing at. */
-			Vector3 pieMenuPingPos;
-			bool pieMenuPingValid;
+			/** The camera ray when the menu opened, for a slice's `%b`, `%h` and `%r`,
+			 * frozen then. The menu takes the mouse for itself, but the player can
+			 * still move, so resolving it again on release would drift away from what
+			 * they were pointing at. */
+			PieAim pieMenuAim;
 
 			void DrawScene();
 			void AddGrenadeToScene(Grenade&);
@@ -794,6 +805,11 @@ namespace spades {
 			 * out of `PlayerSpawned` because a demo seek skips the rest of that work but
 			 * still has to rebuild the marks in force at the destination. */
 			void TeamplayPlayerSpawned(int playerId);
+
+			// ── Pie Menu, called by the net client ─────────────────
+			/** The server sent a menu, which replaces the one shown from the next
+			 * time the menu opens. One with no pies means no menu at all. */
+			void PieMenuReceived(PieMenu);
 
 			// ── Damage Markers, called by the net client ───────────
 			/** The server applied `amount` damage to a player the local player hit. A

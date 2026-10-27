@@ -141,8 +141,7 @@ namespace spades {
 			  staffSpectating(false),
 			  spectatorPlayerNames(true),
 			  teamOverlayHeld(false),
-			  teamOverlayAlpha(0.0F),
-			  pieMenuPingValid(false) {
+			  teamOverlayAlpha(0.0F) {
 			SPADES_MARK_FUNCTION();
 			SPLog("Initializing...");
 
@@ -208,6 +207,11 @@ namespace spades {
 				return;
 
 			scriptedUI->CloseUI();
+
+			// A held menu belongs to the world it opened in: its aim and its target
+			// mean nothing in the next one.
+			if (pieMenuView)
+				pieMenuView->Close();
 
 			RemoveAllLocalEntities();
 
@@ -728,38 +732,112 @@ namespace spades {
 			}
 		}
 
-		void Client::OpenPieMenu() {
+		void Client::PieMenuReceived(PieMenu menu) {
+			// Where each ring was left is only worth remembering for the same rings:
+			// a server sends its menu again once it knows the player's locale.
+			if (!serverPieMenu || serverPieMenu->pies != menu.pies)
+				pieMenuView->ForgetRings();
+			serverPieMenu = std::move(menu);
+		}
+
+		bool Client::OpenPieMenu() {
 			if (!pieMenuView || !world)
-				return;
+				return false;
+
+			// The client's own rings mark a place only where the server takes pings,
+			// which it may allow or refuse at any time.
+			const PieMenu& menu =
+			  serverPieMenu ? *serverPieMenu : BuiltInPieMenu(teamplay->CanSendPing());
+
+			// The server has said there is no menu here, and the client's own does
+			// not come back. Say so instead of swallowing the key.
+			if (menu.pies.empty()) {
+				ShowAlert(_Tr("Client", "This server does not offer a quick menu."),
+						  AlertType::Notice);
+				return false;
+			}
 
 			auto maybePlayer = world->GetLocalPlayer();
 			if (!maybePlayer)
-				return;
+				return false;
 
 			Player& lp = maybePlayer.value();
 
-			// Hot tracking resolves against the camera target, so once dead it would
-			// follow whoever the spectated teammate is aiming at. Dead players broadcast.
+			// The camera actually drawn, the free one for a spectator: what it looked
+			// at as the menu opened is what the context and a slice's tokens
+			// describe. The aim has no length limit: enough voxel steps to cross the
+			// whole map, and a server that wants a limit applies its own.
+			pieMenuAim = PieAim();
+			pieMenuAim.origin = lastSceneDef.viewOrigin;
+			pieMenuAim.direction = lastSceneDef.viewAxis[2].Normalize();
+			const auto& map = world->GetMap();
+			GameMap::RayCastResult ray = map->CastRay2(pieMenuAim.origin, pieMenuAim.direction,
+													   map->Width() + map->Height() + map->Depth());
+			if (ray.hit && !ray.startSolid) {
+				pieMenuAim.block = ray.hitBlock;
+				pieMenuAim.point = ray.hitPos;
+			}
+			// The same ray finds the player, met only in front of that block. The
+			// weapon ray stops at the fog, so the block it is compared with is the
+			// one found above.
 			int targetId = -1;
-			auto variant = PieMenuView::Variant::World;
-			if (lp.IsAlive()) {
-				auto hot = HotTrackedPlayer(true);
-				if (hot) {
-					Player& target = std::get<0>(*hot);
-					targetId = target.GetId();
-					variant = lp.IsTeammate(target) ? PieMenuView::Variant::Teammate
-													: PieMenuView::Variant::Enemy;
-				}
+			World::WeaponRayCastResult shot =
+			  world->WeaponRayCast(pieMenuAim.origin, pieMenuAim.direction, ViewExcludedPlayerId());
+			if (shot.hit && shot.playerId &&
+				(!pieMenuAim.point || (shot.hitPos - pieMenuAim.origin).GetSquaredLength() <
+										(*pieMenuAim.point - pieMenuAim.origin).GetSquaredLength())) {
+				pieMenuAim.point = shot.hitPos;
+				targetId = *shot.playerId;
 			}
 
-			// Where a ping would land is settled here with the rest of the context
-			// and not re-resolved: the marker belongs to the place the player
-			// called out as they opened the menu, not to wherever the crosshair
-			// drifted while they picked a slice. A dead player is looking through
-			// somebody else's eyes, so there is nothing of their own to point at.
-			pieMenuPingValid = lp.IsAlive() && ResolveCrosshairWorldPos(pieMenuPingPos);
+			// A dead player and a spectator, staff spectating included, each have a
+			// context of their own whatever they aim at.
+			PieContext context = pieMenuAim.block ? PieContextBlock : PieContextSky;
+			pieMenuSpectating = IsSpectatingForPieMenu();
+			if (pieMenuSpectating) {
+				context = PieContextSpectator;
+			} else if (!lp.IsAlive()) {
+				context = PieContextDead;
+			} else if (targetId >= 0) {
+				context = lp.IsTeammate(world->GetPlayer(targetId).value()) ? PieContextTeammate
+																			 : PieContextEnemy;
+			}
 
-			pieMenuView->Open(variant, targetId);
+			// A context with no pies has no menu, and no other context's rings
+			// stand in for it.
+			std::vector<Pie> pies = menu.PiesFor(context);
+			if (pies.empty())
+				return false;
+
+			pieMenuView->Open(std::move(pies), context, targetId);
+			return true;
+		}
+
+		bool Client::IsSpectatingForPieMenu() {
+			auto maybePlayer = world ? world->GetLocalPlayer() : stmp::optional<Player&>();
+			return staffSpectating || (maybePlayer && maybePlayer->IsSpectator());
+		}
+
+		stmp::optional<int> Client::ViewExcludedPlayerId() {
+			// Looking out of someone's eyes, they are not what is aimed at.
+			if (IsFirstPerson(GetCameraMode()))
+				return GetCameraTargetPlayerId();
+			return world->GetLocalPlayerIndex();
+		}
+
+		void Client::CommitPieSlice(const PieSlice& slice, int targetPlayerId) {
+			SPADES_MARK_FUNCTION();
+
+			if (!net || !world)
+				return;
+
+			// A blank slice cannot be chosen; anything else is a chat line, an empty
+			// one included. The client reads none of it: servers find a command by
+			// its leading /, on either channel.
+			if (slice.IsBlank())
+				return;
+			net->SendChatUTF8(ExpandPieText(slice.text, targetPlayerId, pieMenuAim),
+							  slice.global);
 		}
 
 		void Client::RunFrame(float dt) {
@@ -829,22 +907,16 @@ namespace spades {
 			paletteView->Update(dt);
 
 			// Close the pie menu if the conditions that let it open no longer hold
-			// (changed team to spectator, entered limbo, opened the console or a
+			// (started or stopped spectating, entered limbo, opened the console or a
 			// scripted UI). Dying is not one of them — the menu stays usable through
 			// the respawn wait.
 			if (pieMenuView->IsOpen()) {
-				bool shouldClose = true;
 				// Anything that takes the mouse takes the menu with it — the console
 				// included, which swallows the key release that would have closed it.
-				if (!NeedsAbsoluteMouseCoordinate() && !staffSpectating) {
-					auto maybePlayer = world->GetLocalPlayer();
-					if (maybePlayer) {
-						Player& lp = maybePlayer.value();
-						if (!lp.IsSpectator())
-							shouldClose = false;
-					}
-				}
-				if (shouldClose)
+				// Its context was fixed as it opened, and means nothing once the
+				// player has crossed between playing and spectating.
+				if (NeedsAbsoluteMouseCoordinate() || !world || !world->GetLocalPlayer() ||
+					IsSpectatingForPieMenu() != pieMenuSpectating)
 					pieMenuView->Close();
 			}
 			pieMenuView->Update(dt);
@@ -1434,26 +1506,6 @@ namespace spades {
 			return true;
 		}
 
-		bool Client::SendTeamplayPing(const Vector3& position, const std::string& reason) {
-			SPADES_MARK_FUNCTION();
-
-			if (!teamplay->CanSendPing())
-				return false;
-
-			// A dead player does not ping: waiting to respawn is not a vantage point,
-			// and a corpse pointing at things the living cannot see is a way of
-			// spectating the enemy. The server drops such a ping anyway.
-			if (!world)
-				return false;
-			auto maybePlayer = world->GetLocalPlayer();
-			if (!maybePlayer || !maybePlayer.value().IsAlive())
-				return false;
-
-			// No client-side rate limit: throttling is the server's job.
-			activeNet->SendTeamplayPing(position, reason);
-			return true;
-		}
-
 		void Client::SendTeamplayPingAtCrosshair() {
 			SPADES_MARK_FUNCTION();
 
@@ -1466,6 +1518,9 @@ namespace spades {
 				return;
 			}
 
+			// A dead player does not ping: waiting to respawn is not a vantage point,
+			// and a corpse pointing at things the living cannot see is a way of
+			// spectating the enemy. Resolving finds nothing for a dead player.
 			Vector3 pos;
 			if (!ResolveCrosshairWorldPos(pos))
 				return;
@@ -1473,8 +1528,9 @@ namespace spades {
 			// The reason is deliberately left empty — a neutral "look here" marker.
 			// Deriving it from what the crosshair is on would turn the ping key into a
 			// confirmation that an enemy is under the crosshair with line of sight. The
-			// pie menu is where a player says what they mean, deliberately.
-			SendTeamplayPing(pos, std::string());
+			// pie menu is where a player says what they mean, deliberately. No
+			// client-side rate limit: throttling is the server's job.
+			activeNet->SendTeamplayPing(pos, std::string());
 		}
 
 		void Client::ServerSentMessage(bool system, const std::string& msg) {
