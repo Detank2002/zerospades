@@ -19,6 +19,7 @@
 
  */
 
+#include <algorithm>
 #include <limits>
 #include <math.h>
 #include <string.h>
@@ -36,6 +37,7 @@
 #include "NetClient.h"
 #include "Player.h"
 #include "TCGameMode.h"
+#include "PieMenu.h"
 #include "Teamplay.h"
 #include "Weapon.h"
 #include "World.h"
@@ -415,10 +417,12 @@ namespace spades {
 					// client-sent packet is already recorded in SendReload(), so
 					// recording the server response would produce a double reload.
 					// Skip Damage Markers too: they are not part of a demo, whose
-					// replay predicts its own damage numbers.
+					// replay predicts its own damage numbers. Nor is the Pie Menu,
+					// which nobody opens during a replay.
 					if (demoRecorder && demoRecorder->IsRecording()) {
 						auto data = reader.GetData();
-						bool skip = reader.GetType() == PacketTypeDamageMarker;
+						bool skip = reader.GetType() == PacketTypeDamageMarker ||
+									reader.GetType() == PacketTypePieMenu;
 						if (data.size() >= 2 &&
 						    static_cast<uint8_t>(data[0]) == PacketTypeWeaponReload) {
 							auto localPlayer = GetLocalPlayerOrNull();
@@ -614,6 +618,7 @@ namespace spades {
 				case ExtensionTypePlayerProperties: return "Player Properties";
 				case ExtensionTypeDamageMarkers: return "Damage Markers";
 				case ExtensionTypeTeamplay: return "Teamplay";
+				case ExtensionTypePieMenu: return "Pie Menu";
 				case ExtensionTypePlayerLimit: return "Player Limit";
 				case ExtensionTypeMessageTypes: return "Message Types";
 				case ExtensionTypeKickReason: return "Kick Reason";
@@ -685,6 +690,13 @@ namespace spades {
 					}
 					return false;
 				}
+				case PacketTypePieMenu:
+					// The menu belongs to the connection, not to the world, so it is
+					// applied whenever it arrives, as the Teamplay Config is.
+					if (status == NetClientStatusConnected)
+						return false;
+					HandlePieMenuPacket(r);
+					return true;
 				case PacketTypeVersionGet: {
 					if (r.GetNumRemainingBytes() > 0) {
 						// Enhanced variant
@@ -867,6 +879,38 @@ namespace spades {
 			}
 		}
 
+		void NetClient::HandlePieMenuPacket(spades::client::NetPacketReader& r) {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypePieMenu)) {
+				SPLog("Ignoring a Pie Menu packet from a server that did not "
+					  "negotiate the extension");
+				return;
+			}
+
+			if (r.GetNumRemainingBytes() < 1) {
+				SPLog("Ignoring a truncated Pie Menu packet");
+				return;
+			}
+
+			if (r.ReadByte() != PieMenuSubMenu) {
+				SPLog("Ignoring an unknown Pie Menu sub packet");
+				return;
+			}
+
+			// A refused menu leaves the previous one standing, and costs the
+			// connection nothing.
+			std::string error;
+			auto menu = ParsePieMenu(r.ReadRemainingData(), error);
+			if (!menu) {
+				SPLog("Refused a Pie Menu: %s", error.c_str());
+				return;
+			}
+
+			SPLog("Received a Pie Menu of %d pies", static_cast<int>(menu->pies.size()));
+			client->PieMenuReceived(std::move(*menu));
+		}
+
 		void NetClient::HandleDamageMarkerPacket(spades::client::NetPacketReader& r) {
 			SPADES_MARK_FUNCTION();
 
@@ -890,6 +934,7 @@ namespace spades {
 
 			switch (r.GetType()) {
 				case PacketTypeTeamplay: HandleTeamplayPacket(r); break;
+				case PacketTypePieMenu: HandlePieMenuPacket(r); break;
 				case PacketTypeDamageMarker: HandleDamageMarkerPacket(r); break;
 				case PacketTypePositionData: {
 					Player& p = GetLocalPlayer();
@@ -1790,6 +1835,27 @@ namespace spades {
 			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
 			w.WriteByte((uint8_t)(global ? 0 : 1));
 			w.WriteString(text);
+			w.WriteByte((uint8_t)0);
+			enet_peer_send(peer, 0, w.CreatePacket());
+		}
+
+		void NetClient::SendChatUTF8(const std::string& text, bool global) {
+			SPADES_MARK_FUNCTION();
+
+			// Only printable ASCII reads the same in CP437 and UTF-8: a control byte
+			// is a symbol in CP437 but a colour code in UTF-8, so a line holding one
+			// keeps the 0xff prefix to keep its UTF-8 meaning.
+			bool ascii = std::all_of(text.begin(), text.end(), [](char c) {
+				auto u = static_cast<unsigned char>(c);
+				return u >= 0x20 && u < 0x7F;
+			});
+
+			NetPacketWriter w(PacketTypeChatMessage);
+			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
+			w.WriteByte((uint8_t)(global ? 0 : 1));
+			if (!ascii)
+				w.WriteByte((uint8_t)UTFSign);
+			w.WriteRawString(text);
 			w.WriteByte((uint8_t)0);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}

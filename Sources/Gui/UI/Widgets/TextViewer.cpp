@@ -302,7 +302,6 @@ namespace spades {
 				}
 
 				// Code and links change the color, so the row is drawn run by run
-				float alpha = item.color.w;
 				for (const TextViewerSegment& seg : item.segments) {
 					Vector4 color = item.color;
 					bool underline = false;

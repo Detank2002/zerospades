@@ -274,9 +274,11 @@ namespace spades {
 			 *
 			 * A reason is free-form UTF-8 chosen by whoever sent it, so it arrives
 			 * unvetted: ill-formed UTF-8 would reach the font as bytes it cannot read,
-			 * newlines would break out of the one line the marker gives it, and padding
-			 * would push the label off centre. Drops the first, strips the rest, then
-			 * caps the length on a UTF-8 codepoint boundary.
+			 * newlines would break out of the one line the marker gives it, other
+			 * control bytes would draw as stray symbols or as colour codes against the
+			 * colour the packet carries, and padding would push the label off centre.
+			 * Drops the first, strips the rest, then caps the length on a UTF-8
+			 * codepoint boundary.
 			 *
 			 * A reason that was nothing but whitespace comes back **empty**, which is a
 			 * value the protocol allows in its own right — a neutral marker with no

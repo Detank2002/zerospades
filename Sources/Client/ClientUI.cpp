@@ -140,7 +140,10 @@ namespace spades {
 		bool ClientUI::WantsClientToBeClosed() { return shouldExit; }
 		bool ClientUI::NeedsInput() { return static_cast<bool>(activeUI) && !peeking; }
 
-		void ClientUI::RecordChatLog(const std::string& msg, Vector4 color) {
+		void ClientUI::RecordChatLog(const std::string& formatted, Vector4 color) {
+			// The log draws text alone, so the chat window's color and image bytes
+			// would show up there as stray symbols.
+			std::string msg = ChatWindow::StripFormatting(formatted);
 			chatLogRecords.emplace_back(msg, color);
 			chatLogWindow->Record(msg, color);
 			if (chatPanel)

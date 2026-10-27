@@ -106,6 +106,7 @@ namespace spades {
 			  {ExtensionTypePlayerProperties, 1},
 			  {ExtensionTypeDamageMarkers, 1},
 			  {ExtensionTypeTeamplay, 1},
+			  {ExtensionTypePieMenu, 1},
 			  {ExtensionTypePlayerLimit, 1},
 			  {ExtensionTypeMessageTypes, 1},
 			  {ExtensionTypeKickReason, 1}};
@@ -142,6 +143,7 @@ namespace spades {
 			bool HandleHandshakePackets(NetPacketReader&);
 			void HandleExtensionPacket(NetPacketReader&);
 			void HandleTeamplayPacket(NetPacketReader&);
+			void HandlePieMenuPacket(NetPacketReader&);
 			void HandleDamageMarkerPacket(NetPacketReader&);
 
 			/** Whether the server negotiated the given extension during the handshake. */
@@ -225,6 +227,7 @@ namespace spades {
 			void SendBlockAction(IntVector3, BlockActionType) override;
 			void SendBlockLine(IntVector3 v1, IntVector3 v2) override;
 			void SendChat(std::string, bool global) override;
+			void SendChatUTF8(const std::string&, bool global) override;
 			void SendReload() override;
 			void SendTeamChange(int team) override;
 			void SendWeaponChange(WeaponType) override;

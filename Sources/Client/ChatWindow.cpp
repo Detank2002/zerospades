@@ -58,6 +58,7 @@ namespace spades {
 			killImages.push_back(renderer.RegisterImage("Gfx/Killfeed/k-Noscope.png").GetPointerOrNull());
 			killImages.push_back(renderer.RegisterImage("Gfx/Killfeed/l-Domination.png").GetPointerOrNull());
 			killImages.push_back(renderer.RegisterImage("Gfx/Killfeed/m-Revenge.png").GetPointerOrNull());
+			SPAssert(killImages.size() == kKillImageCount);
 		}
 
 		ChatWindow::~ChatWindow() {}
@@ -103,7 +104,7 @@ namespace spades {
 		}
 		IImage* ChatWindow::GetKillImage(char index) {
 			int real = index - 'a';
-			if (real >= 0 && real < (int)killImages.size())
+			if (real >= 0 && real < kKillImageCount)
 				return killImages[real];
 			return NULL;
 		}
@@ -128,6 +129,23 @@ namespace spades {
 			s += c;
 			s += msg;
 			s += MsgColorRestore;
+			return s;
+		}
+
+		std::string ChatWindow::StripFormatting(const std::string& msg) {
+			std::string s;
+			s.reserve(msg.size());
+			for (size_t i = 0; i < msg.size(); i++) {
+				if (msg[i] >= 1 && msg[i] <= MsgColorMax) {
+					// An image takes the byte after it as its kind, when that names
+					// one; otherwise the byte is text, as Draw reads it.
+					if (msg[i] == MsgImage && i + 1 < msg.size() && msg[i + 1] >= 'a' &&
+						msg[i + 1] < 'a' + kKillImageCount)
+						i++;
+					continue;
+				}
+				s += msg[i];
+			}
 			return s;
 		}
 

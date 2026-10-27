@@ -69,6 +69,8 @@ namespace spades {
 			float GetHeight();
 			float GetLineHeight();
 
+			/** Kill images are named by a letter from `a`, after `MsgImage`. */
+			static constexpr int kKillImageCount = 13;
 			std::vector<IImage*> killImages;
 			IImage* GetKillImage(char);
 
@@ -80,6 +82,9 @@ namespace spades {
 			static std::string ColoredMessage(const std::string&, char);
 			static std::string TeamColorMessage(const std::string&, int);
 			static std::string KillImage(int killType, int weaponType = -1);
+			/** The message as text alone: the color and image control bytes this
+			 * window acts on are removed, as it never draws them as characters. */
+			static std::string StripFormatting(const std::string&);
 
 			/** Returns the color that a message color control byte selects. */
 			Vector4 GetColor(char);

@@ -23,7 +23,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
 #include <limits>
 #include <vector>
 
@@ -258,118 +257,101 @@ namespace spades {
 				return ToUpperCase(key);
 			}
 
-			// Ring definitions. Slice order is top, then clockwise; Affirmative and
-			// Negative occupy the same slots in both variants so the gesture transfers.
-			struct PageDef {
-				const char* name;
-				bool global;
-				const char* labels[PieMenuView::kSliceCount];
-				// Slices that drop a Teamplay ping on whatever the crosshair was
-				// on instead of talking, falling back to the same message on chat
-				// where the server does not allow pings. The ping carries the
-				// slice's own label as its reason: the extension assigns no reason
-				// values, and a receiving client renders the string as it came, so
-				// a made-up token would only show up as "tear" on another screen.
-				bool pings[PieMenuView::kSliceCount];
-			};
+			// How wide a label may run inside its wedge, at the label radius, with
+			// some room left on either side.
+			constexpr float kLabelMaxWidth = 108.0F;
+			// A tooltip is read under the ring, as wide as the ring itself.
+			constexpr float kTooltipMaxWidth = 2.0F * kRingOuter;
+			// From the ring's furthest reach to the first tooltip line, clear of the
+			// page dots below the ring.
+			constexpr float kTooltipGap = 26.0F;
 
-			// Layout rule, held across every ring: slice 0 is at the top and the
-			// rest follow clockwise, the vertical axis carries a pair of opposites,
-			// the right half is about them and the left half is about us.
-			//
-			// The ring a message sits on is what says how it travels, so nobody has
-			// to remember it slice by slice: the first ring points at a place, the
-			// second one talks, the third one calls the game.
+			// A slice is styled by what it sends, so a wedge that pings, one that
+			// speaks and one that runs a command need not be told apart by reading.
+			// FIXME: a leading / says nothing of intent, so two commands are known by
+			// name: /pingmark marks a place, and /pm only talks, so it is drawn as
+			// chat. Any other command that talks is still drawn as a command.
+			Vector3 SliceAccent(const PieSlice& slice) {
+				const std::string& t = slice.text;
+				if (t.compare(0, 10, "/pingmark ") == 0)
+					return MakeVector3(1.0F, 0.78F, 0.3F);
+				if (t.compare(0, 1, "/") == 0 && t.compare(0, 4, "/pm ") != 0)
+					return MakeVector3(0.5F, 0.78F, 1.0F);
+				return MakeVector3(1.0F, 1.0F, 1.0F);
+			}
 
-			// Every slice names somewhere, so every slice drops a marker there: on the
-			// ground, or on the player the crosshair was on, where the ray met them.
-			// A server without the extension gets the same words on team chat.
-			constexpr PageDef kPointPage = {
-			  "Point", false,
-			  {"Enemy Here!", "Tear It Down!", "Watch This Spot",
-			   "Go Here!", "Let's Dig Here", "Help Me Build"},
-			  {true, true, true, true, true, true}};
+			// Cuts a line short, at a codepoint boundary, so that it fits with an
+			// ellipsis after it.
+			std::string Ellipsize(IFont& font, const std::string& text, float maxWidth) {
+				if (font.Measure(text).x <= maxWidth)
+					return text;
 
-			// Offered when the crosshair is on terrain rather than on a player.
-			const PageDef kWorldPages[] = {
-				kPointPage,
-				// Said to the team, about nowhere in particular: a marker would only
-				// put "thank you" on a piece of ground.
-				{"Social", false,
-				 {"Affirmative", "Thank You", "Hi!",
-				  "Negative", "Sorry!", "Help Me"},
-				 {false, false, false, false, false, false}},
-				// The objective rather than the ground: where the intel is and what
-				// to do about it is already known to everyone, so none of it points.
-				{"Tactics", false,
-				 {"Attack!", "Get the Intel!", "Enemy Has the Intel!",
-				  "Fall Back!", "Regroup on Me", "Defend the Intel!"},
-				 {false, false, false, false, false, false}},
-			};
+				// Searched for rather than walked back one character at a time: a
+				// menu can hold sixty labels of 255 bytes, all fitted as it opens.
+				std::vector<size_t> bounds; // codepoint starts, past the first
+				for (size_t i = 1; i < text.size(); i++)
+					if (!IsUTF8Continuation(text[i]))
+						bounds.push_back(i);
 
-			// Offered while the crosshair is on a teammate, and sent to them alone.
-			// A person is not a place, so their own rings do not point; the rings keep
-			// the order they have on terrain, and Social keeps the same six words, so
-			// the gesture is the same whoever it is aimed at. Point comes last, one
-			// flip back from the first ring, so calling a spot never needs the
-			// crosshair taken off a player first.
-			const PageDef kTeammatePages[] = {
-				// Directions are relative to the teammate under the crosshair, which
-				// makes them exact in a way a broadcast "our right" cannot be. Up,
-				// down, left and right sit where they point; the two threats that
-				// have no direction take the lower corners.
-				{"Warn", false,
-				 {"Above You!", "On Your Right!", "Behind You!",
-				  "Below You!", "Sniper on You!", "On Your Left!"},
-				 {false, false, false, false, false, false}},
-				{"Social", false,
-				 {"Affirmative", "Thank You", "Hi!",
-				  "Negative", "Sorry!", "Help Me"},
-				 {false, false, false, false, false, false}},
-				{"Cooperate", false,
-				 {"Follow Me", "Cover Me", "Let Me Through",
-				  "Stay Here", "Boost Me Up", "Help Me Build"},
-				 {false, false, false, false, false, false}},
-				kPointPage,
-			};
+				auto candidate = [&](size_t n) {
+					return TrimSpaces(text.substr(0, n == 0 ? 0 : bounds[n - 1])) + "...";
+				};
+				size_t lo = 0, hi = bounds.size(); // candidate(lo) is the fallback
+				while (lo < hi) {
+					size_t mid = (lo + hi + 1) / 2;
+					if (font.Measure(candidate(mid)).x <= maxWidth)
+						lo = mid;
+					else
+						hi = mid - 1;
+				}
+				return candidate(lo);
+			}
 
-			// Offered only while the crosshair is on an enemy. The taunt goes out on
-			// global chat so the whole server reads it, addressed to the player it was
-			// aimed at; Point, as on a teammate, is one flip away.
-			const PageDef kEnemyPages[] = {
-				// A taunt goes to the whole server, at the player it was aimed at;
-				// a team marker has no business carrying one.
-				{"Taunt", true,
-				 {"I See You", "Nice Try", "Miss Me?",
-				  "Too Easy", "Behind You...", "Say Goodbye"},
-				 {false, false, false, false, false, false}},
-				kPointPage,
-			};
+			// Lays a label out on one line, or two broken at the space that balances
+			// them best, cutting short whatever still does not fit.
+			std::vector<std::string> FitLines(IFont& font, const std::string& text,
+											  float maxWidth) {
+				if (text.empty())
+					return {};
+				if (font.Measure(text).x <= maxWidth)
+					return {text};
+
+				size_t bestSplit = std::string::npos;
+				float bestWidth = std::numeric_limits<float>::infinity();
+				for (size_t i = text.find(' '); i != std::string::npos;
+					 i = text.find(' ', i + 1)) {
+					float w = std::max(font.Measure(text.substr(0, i)).x,
+									   font.Measure(text.substr(i + 1)).x);
+					if (w < bestWidth) {
+						bestWidth = w;
+						bestSplit = i;
+					}
+				}
+
+				if (bestSplit == std::string::npos)
+					return {Ellipsize(font, text, maxWidth)};
+
+				return {Ellipsize(font, TrimSpaces(text.substr(0, bestSplit)), maxWidth),
+						Ellipsize(font, TrimSpaces(text.substr(bestSplit + 1)), maxWidth)};
+			}
+
+			// A label or a theme came off the wire, so it is made safe to draw: what
+			// the font cannot lay out on one line is dropped. Only what is drawn is
+			// touched; the Text a slice sends goes out exactly as it came.
+			std::string DisplayText(const std::string& text) {
+				std::string out;
+				out.reserve(text.size());
+				for (char c : StripNewlines(text)) {
+					auto u = static_cast<unsigned char>(c);
+					if (u >= 0x20 && u != 0x7F)
+						out += c;
+				}
+				return TrimSpaces(out);
+			}
 		} // namespace
 
 		PieMenuView::PieMenuView(Client* c, IFont* f, IFont* big)
 			: renderer(c->GetRenderer()), font(f), bigFont(big) {
-			auto buildPages = [](const PageDef* defs, size_t count) {
-				std::vector<Page> pages;
-				pages.reserve(count);
-				for (size_t i = 0; i < count; i++) {
-					const PageDef& def = defs[i];
-					Page p;
-					p.name = def.name;
-					p.global = def.global;
-					for (int s = 0; s < kSliceCount; s++) {
-						p.labels[static_cast<size_t>(s)] = def.labels[s];
-						p.pings[static_cast<size_t>(s)] = def.pings[s];
-					}
-					pages.push_back(std::move(p));
-				}
-				return pages;
-			};
-
-			worldPages = buildPages(kWorldPages, std::size(kWorldPages));
-			teammatePages = buildPages(kTeammatePages, std::size(kTeammatePages));
-			enemyPages = buildPages(kEnemyPages, std::size(kEnemyPages));
-
 			const float halfSliceRad = kSliceSpan * 0.5F - DEG2RAD(kSliceGapDeg) * 0.5F;
 			for (int i = 0; i < kSliceCount; i++) {
 				float center = -kHalfPi + kSliceSpan * static_cast<float>(i);
@@ -383,22 +365,49 @@ namespace spades {
 		PieMenuView::~PieMenuView() {}
 
 		const PieMenuView::Page& PieMenuView::CurrentPage() const {
-			const auto& pages = CurrentPages();
 			SPAssert(!pages.empty());
-			size_t idx = static_cast<size_t>(std::max(0, page));
-			if (idx >= pages.size())
-				idx = pages.size() - 1;
-			return pages[idx];
+			return pages[static_cast<size_t>(Clamp(page, 0, GetPageCount() - 1))];
 		}
 
+		const Pie& PieMenuView::CurrentPie() const { return CurrentPage().pie; }
+
 		void PieMenuView::RestorePage() {
-			int remembered = lastPage[static_cast<size_t>(variant)];
+			int remembered = lastPage[static_cast<size_t>(contextIndex)];
 			page = std::max(0, std::min(remembered, GetPageCount() - 1));
 		}
 
-		void PieMenuView::Open(Variant v, int tgtId) {
+		void PieMenuView::Open(std::vector<Pie> newPies, PieContext context, int tgtId) {
+			SPAssert(!newPies.empty());
+
+			pages.clear();
+			pages.reserve(newPies.size());
+			for (Pie& pie : newPies) {
+				Page p;
+				p.theme = DisplayText(pie.theme);
+				for (size_t i = 0; i < kSliceCount; i++) {
+					// A label that draws as nothing must not hide a slice that
+					// sends something: what it sends is drawn instead, and failing
+					// that a mark, so the wedge never passes for an empty one.
+					const PieSlice& slice = pie.slices[i];
+					p.labels[i] = DisplayText(slice.label);
+					if (p.labels[i].empty())
+						p.labels[i] = DisplayText(slice.text);
+					if (p.labels[i].empty() && !slice.IsBlank())
+						p.labels[i] = "?";
+					p.lines[i] = FitLines(*font, p.labels[i], kLabelMaxWidth);
+					p.tooltips[i] = FitLines(*font, DisplayText(slice.tooltip), kTooltipMaxWidth);
+				}
+				p.pie = std::move(pie);
+				pages.push_back(std::move(p));
+			}
+
+			// A menu opens on exactly one context, and each has its own slot.
+			contextIndex = 0;
+			while (contextIndex < kContextCount && context != (1 << contextIndex))
+				contextIndex++;
+			SPAssert(contextIndex < kContextCount);
+
 			open = true;
-			variant = v;
 			targetPlayerId = tgtId;
 			cursor = {0.0F, 0.0F};
 			selection = None;
@@ -429,9 +438,12 @@ namespace spades {
 				return;
 
 			page = ((page + dir) % count + count) % count;
-			lastPage[static_cast<size_t>(variant)] = page;
+			lastPage[static_cast<size_t>(contextIndex)] = page;
 			pagePhase = 0.0F;
 			hintNeeded = false;
+
+			// The wedge under the cursor may be empty on the new ring.
+			UpdateSelection();
 		}
 
 		void PieMenuView::Update(float dt) {
@@ -458,11 +470,10 @@ namespace spades {
 			}
 		}
 
-		const std::string& PieMenuView::GetSelectionLabel() const {
-			static const std::string empty;
-			if (selection < 0 || selection >= kSliceCount)
-				return empty;
-			return CurrentPage().labels[static_cast<size_t>(selection)];
+		const PieSlice* PieMenuView::GetSelectedSlice() const {
+			if (!open || selection < 0 || selection >= kSliceCount)
+				return nullptr;
+			return &CurrentPie().slices[static_cast<size_t>(selection)];
 		}
 
 		void PieMenuView::HandleMouseDelta(float dx, float dy) {
@@ -477,9 +488,13 @@ namespace spades {
 			if (len > maxR) {
 				cursor.x *= maxR / len;
 				cursor.y *= maxR / len;
-				len = maxR;
 			}
 
+			UpdateSelection();
+		}
+
+		void PieMenuView::UpdateSelection() {
+			float len = sqrtf(cursor.x * cursor.x + cursor.y * cursor.y);
 			if (len < kDeadZone) {
 				selection = None;
 				return;
@@ -492,6 +507,10 @@ namespace spades {
 
 			// kSliceCount equal slices, top slice centered at angle 0.
 			int idx = static_cast<int>(floorf((angle + kSliceSpan * 0.5F) / kSliceSpan)) % kSliceCount;
+
+			// A blank wedge sends nothing, so it is never highlighted as if it would.
+			if (CurrentPie().slices[static_cast<size_t>(idx)].IsBlank())
+				idx = None;
 			selection = idx;
 		}
 
@@ -528,10 +547,16 @@ namespace spades {
 			// Slices
 			for (int i = 0; i < kSliceCount; i++) {
 				float h = highlight[i];
-				float fillA = (0.08F + (0.85F - 0.08F) * h) * alpha;
+				// A blank wedge is never highlighted, and sits back from the rest.
+				const PieSlice& slice = CurrentPie().slices[static_cast<size_t>(i)];
+				float restA = slice.IsBlank() ? 0.03F : 0.08F;
+				float fillA = (restA + (0.85F - restA) * h) * alpha;
+				Vector3 accent = SliceAccent(slice);
 				const SliceRay& rr = sliceRays[i];
-				DrawSliceFill(renderer, MakeVector4(fillA, fillA, fillA, fillA), center, rInner,
-							  sliceOuter(i), rr.s1, rr.c1, rr.s2, rr.c2);
+				DrawSliceFill(renderer,
+							  MakeVector4(accent.x * fillA, accent.y * fillA, accent.z * fillA,
+										  fillA),
+							  center, rInner, sliceOuter(i), rr.s1, rr.c1, rr.s2, rr.c2);
 			}
 
 			// Outer and inner outline rings (thin). The outer one is drawn slice by
@@ -554,30 +579,49 @@ namespace spades {
 				Vector2 dir = {cosf(sliceCenterAngles[i]), sinf(sliceCenterAngles[i])};
 				Vector2 p = center + dir * rLabel;
 
-				const std::string& label = labels[i];
-				Vector2 sz = font->Measure(label);
-				Vector2 textPos = {p.x - sz.x * 0.5F, p.y - sz.y * 0.5F};
+				const auto& lines = CurrentPage().lines[i];
+				if (lines.empty())
+					continue;
 
+				// A blank slice has no label, so only sending ones reach here.
 				float textA = (0.85F + 0.15F * h) * alpha * easedPage;
-				Vector4 textColor = MakeVector4(1, 1, 1, textA);
+				Vector3 accent = SliceAccent(CurrentPie().slices[static_cast<size_t>(i)]);
+				Vector4 textColor = MakeVector4(accent.x, accent.y, accent.z, textA);
 				Vector4 textShadow = MakeVector4(0, 0, 0, 0.6F * textA);
-				font->DrawShadow(label, textPos, 1.0F, textColor, textShadow);
+
+				float lineH = font->Measure("A").y;
+				float y = p.y - lineH * static_cast<float>(lines.size()) * 0.5F;
+				for (const std::string& line : lines) {
+					float w = font->Measure(line).x;
+					font->DrawShadow(line, MakeVector2(p.x - w * 0.5F, y), 1.0F, textColor,
+									 textShadow);
+					y += lineH;
+				}
 			}
 
 			// Center readout: currently selected slice label, scaled by its highlight
 			if (selection >= 0 && selection < kSliceCount && bigFont) {
 				float h = highlight[selection];
 				const std::string& centerLabel = labels[selection];
-				Vector2 sz = bigFont->Measure(centerLabel);
+				// The hole in the middle is all it has: the big font while it fits,
+				// then the small one, cut short if even that does not.
+				float maxW = 2.0F * rInner - 12.0F;
+				IFont* centerFont = bigFont;
+				std::string text = centerLabel;
+				if (bigFont->Measure(text).x > maxW) {
+					centerFont = font;
+					text = Ellipsize(*font, text, maxW);
+				}
+				Vector2 sz = centerFont->Measure(text);
 				Vector2 pos = {center.x - sz.x * 0.5F, center.y - sz.y * 0.5F};
 				float a = h * alpha * easedPage;
 				Vector4 col = MakeVector4(a, a, a, a);
 				Vector4 shd = MakeVector4(0, 0, 0, 0.7F * a);
-				bigFont->DrawShadow(centerLabel, pos, 1.0F, col, shd);
+				centerFont->DrawShadow(text, pos, 1.0F, col, shd);
 			} else if (font) {
 				// Nothing aimed at yet: name the ring instead, so which one is up
 				// can be read at a glance rather than inferred from six labels.
-				const std::string& pageName = CurrentPage().name;
+				std::string pageName = Ellipsize(*font, CurrentPage().theme, 2.0F * rInner - 12.0F);
 				Vector2 sz = font->Measure(pageName);
 				Vector2 pos = {center.x - sz.x * 0.5F, center.y - sz.y * 0.5F};
 				float a = alpha * easedPage * 0.55F;
@@ -586,6 +630,22 @@ namespace spades {
 			}
 
 			DrawPageIndicator(center, rOuter, alpha);
+
+			// The highlighted slice's tooltip, under the ring and its page dots: the
+			// hole in the middle is too small for a sentence.
+			if (selection >= 0 && selection < kSliceCount && font) {
+				const auto& tip = CurrentPage().tooltips[selection];
+				float a = highlight[selection] * alpha * easedPage;
+				float lineH = font->Measure("A").y;
+				float y = center.y + rOuter + kHighlightReach + kTooltipGap;
+				for (const std::string& line : tip) {
+					float w = font->Measure(line).x;
+					font->DrawShadow(line, MakeVector2(center.x - w * 0.5F, y), 1.0F,
+									 MakeVector4(0.85F * a, 0.85F * a, 0.85F * a, a),
+									 MakeVector4(0, 0, 0, 0.6F * a));
+					y += lineH;
+				}
+			}
 		}
 
 		void PieMenuView::DrawPageIndicator(Vector2 center, float rOuter, float alpha) {
