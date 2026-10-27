@@ -133,8 +133,15 @@ namespace spades {
 				return base->RegisterModel(filename);
 			}
 
+			std::vector<std::string> GetRegisteredFiles() {
+				OnProhibitedAction();
+				return {};
+			}
+
 			Handle<IImage> CreateImage(Bitmap& bmp) { return base->CreateImage(bmp); }
 			Handle<IModel> CreateModel(VoxelModel& m) { return base->CreateModel(m); }
+			void ReplaceImage(IImage&, IImage&) { OnProhibitedAction(); }
+			void ReplaceModel(IModel&, IModel&) { OnProhibitedAction(); }
 
 			void SetGameMap(stmp::optional<GameMap&>) { OnProhibitedAction(); }
 
@@ -296,12 +303,16 @@ namespace spades {
 			flashlightOrientation = p.GetFront();
 			classicViewWeaponOrigin = MakeVector3(0, 0, 0);
 
-			ScriptContextHandle ctx;
-			IAudioDevice& audio = client.GetAudioDevice();
-			skinScriptGeneration = ScriptManager::GetInstance()->GetGeneration();
-
 			sandboxedRenderer = Handle<SandboxedRenderer>::New(client.GetRenderer());
+			CreateSkins();
+		}
+
+		void ClientPlayer::CreateSkins() {
+			SPADES_MARK_FUNCTION();
+
+			IAudioDevice& audio = client.GetAudioDevice();
 			IRenderer& renderer = *sandboxedRenderer;
+			skinScriptGeneration = ScriptManager::GetInstance()->GetGeneration();
 
 			static ScriptFunction spadeFactory(
 			  "ISpadeSkin@ CreateThirdPersonSpadeSkin(Renderer@, AudioDevice@)");
@@ -339,7 +350,7 @@ namespace spades {
 			  "IWeaponSkin@ CreateViewSMGSkin(Renderer@, AudioDevice@)");
 			static ScriptFunction shotgunViewFactory(
 			  "IWeaponSkin@ CreateViewShotgunSkin(Renderer@, AudioDevice@)");
-			switch (p.GetWeaponType()) {
+			switch (player.GetWeaponType()) {
 				case RIFLE_WEAPON:
 					weaponSkin = initScriptFactory(rifleFactory, renderer, audio);
 					weaponViewSkin = initScriptFactory(rifleViewFactory, renderer, audio);
@@ -355,6 +366,37 @@ namespace spades {
 				default: SPAssert(false);
 			}
 		}
+
+		void ClientPlayer::RebuildSkins() {
+			SPADES_MARK_FUNCTION();
+
+			std::array<asIScriptObject**, 8> skins = {
+			  &spadeSkin,     &blockSkin,     &weaponSkin,     &grenadeSkin,
+			  &spadeViewSkin, &blockViewSkin, &weaponViewSkin, &grenadeViewSkin};
+			std::array<asIScriptObject*, 8> old;
+			for (std::size_t i = 0; i < skins.size(); i++) {
+				old[i] = *skins[i];
+				*skins[i] = nullptr;
+			}
+
+			try {
+				CreateSkins();
+			} catch (const std::exception& ex) {
+				// Keep the skins of the previous scripts, and don't try again each frame.
+				SPLog("Skins of player #%d not rebuilt: %s", player.GetId(), ex.what());
+				for (std::size_t i = 0; i < skins.size(); i++) {
+					if (*skins[i])
+						(*skins[i])->Release();
+					*skins[i] = old[i];
+				}
+				skinScriptGeneration = ScriptManager::GetInstance()->GetGeneration();
+				return;
+			}
+
+			for (asIScriptObject* skin : old)
+				skin->Release();
+		}
+
 		ClientPlayer::~ClientPlayer() {
 			spadeSkin->Release();
 			blockSkin->Release();

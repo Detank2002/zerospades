@@ -27,7 +27,6 @@
 #include <Core/VoxelModel.h>
 
 namespace spades {
-	class ResourceChanges;
 	namespace draw {
 		class SWModelRenderer;
 
@@ -69,8 +68,8 @@ namespace spades {
 			Handle<SWModel> CreateModel(VoxelModel&);
 
 			void ClearCache();
-			/** Gives the cached models from a changed file their new content. */
-			void ReloadResources(const ResourceChanges&);
+			/** The files the cached models were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

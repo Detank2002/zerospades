@@ -284,10 +284,11 @@ namespace spades {
 			imageManager->ClearCache();
 		}
 
-		void GLRenderer::ReloadResources(const ResourceChanges& changes) {
-			SPADES_MARK_FUNCTION();
-			imageManager->ReloadResources(changes);
-			modelManager->ReloadResources(changes);
+		std::vector<std::string> GLRenderer::GetRegisteredFiles() {
+			std::vector<std::string> files = imageManager->GetFiles();
+			for (std::string& file : modelManager->GetFiles())
+				files.push_back(std::move(file));
+			return files;
 		}
 
 		Handle<client::IImage> GLRenderer::CreateImage(spades::Bitmap& bmp) {
@@ -298,6 +299,24 @@ namespace spades {
 		Handle<client::IModel> GLRenderer::CreateModel(spades::VoxelModel& model) {
 			SPADES_MARK_FUNCTION();
 			return Handle<GLOptimizedVoxelModel>::New(&model, *this).Cast<client::IModel>();
+		}
+
+		void GLRenderer::ReplaceImage(client::IImage& target, client::IImage& source) {
+			SPADES_MARK_FUNCTION();
+			auto* t = dynamic_cast<GLImage*>(&target);
+			auto* s = dynamic_cast<GLImage*>(&source);
+			if (!t || !s)
+				SPInvalidArgument("target/source");
+			t->Replace(*s);
+		}
+
+		void GLRenderer::ReplaceModel(client::IModel& target, client::IModel& source) {
+			SPADES_MARK_FUNCTION();
+			auto* t = dynamic_cast<GLOptimizedVoxelModel*>(&target);
+			auto* s = dynamic_cast<GLOptimizedVoxelModel*>(&source);
+			if (!t || !s)
+				SPInvalidArgument("target/source");
+			t->Replace(*s);
 		}
 
 		void GLRenderer::EnsureInitialized() {

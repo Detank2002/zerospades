@@ -23,12 +23,15 @@
 
 #include <list>
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 
 #include "ClientCameraMode.h"
+#include "GameResources.h"
+#include <Core/PakOverlay.h>
 #include "DemoNetClient.h"
 #include "INetClient.h"
 #include "NetClient.h"
@@ -144,6 +147,11 @@ namespace spades {
 			std::unique_ptr<World> world;
 			Handle<GameMap> map;
 			std::unique_ptr<GameMapWrapper> mapWrapper;
+			// The software's renderer and audio device: the menus, the loading screen.
+			Handle<IRenderer> shellRenderer;
+			Handle<IAudioDevice> shellAudioDevice;
+			// The game's assets, and the renderer and audio device that load them.
+			Handle<GameResources> gameResources;
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audioDevice;
 			float time;
@@ -533,8 +541,14 @@ namespace spades {
 			void OnSpawnPressed();
 			void OnClosePressed();
 
+			/** Mounts `paks` as the game's mods and reloads what that changed, or nothing. */
+			std::string SetGameMods(PakOverlay::PakSet paks);
+			void UnloadGameMods();
+
 			// Killsteak sounds
 			std::vector<Handle<IAudioChunk>> killSounds;
+			// GameResources::GetGeneration() when the folder was listed.
+			std::uint64_t killSoundsGeneration = 0;
 			void LoadKillSounds();
 
 			void UpdateWorld(float dt, float gameplayDt);
@@ -772,6 +786,20 @@ namespace spades {
 			IRenderer& GetRenderer() { return *renderer; }
 			SceneDefinition GetLastSceneDef() { return lastSceneDef; }
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
+			GameResources& GetGameResources() { return *gameResources; }
+
+			/**
+			 * Loads the mod in the pak at `path`, a resource path, over the game's
+			 * assets, without a restart: a skin or weapon mod, for example. Such a
+			 * mod holds game assets only: models, images, sounds and skin scripts.
+			 * Returns why it wasn't loaded, or "" once it is; on a failure nothing
+			 * changes. The game unloads its mods when it ends.
+			 *
+			 * Nothing calls these yet.
+			 */
+			std::string LoadGameMod(const std::string& path);
+			/** Unloads the mod loaded from `path`. Returns why it couldn't, or "". */
+			std::string UnloadGameMod(const std::string& path);
 			gui::SoftwareCursor* GetCursor() { return cursor.get(); }
 
 			float GetTime() { return time; }

@@ -1,59 +1,62 @@
 #: Sources/Client/Client.cpp:185 Sources/Client/Client.cpp:1219
 #: Sources/Client/Client_NetHandler.cpp:408
-#: Sources/Gui/UI/Components/LimboMenu.cpp:66
+#: Sources/Gui/UI/Components/LimboMenu.cpp:66 Sources/Client/Client.cpp:190
+#: Sources/Client/Client.cpp:1298
 msgctxt "Client"
 msgid "Spectator"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1178
+#: Sources/Client/Client.cpp:1178 Sources/Client/Client.cpp:1257
 #, c++-format
 msgctxt "Client"
 msgid "Map saved: {0}"
 msgstr ""
 
 #: Sources/Client/Client.cpp:1182 Sources/Client/Client.cpp:1187
+#: Sources/Client/Client.cpp:1261 Sources/Client/Client.cpp:1266
 msgctxt "Client"
 msgid "Saving map failed: "
 msgstr ""
 
 #: Sources/Client/Client.cpp:1216 Sources/Gui/UI/InGame/ChatWindow.cpp:597
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:692
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:692 Sources/Client/Client.cpp:1295
 msgctxt "Client"
 msgid "Global"
 msgstr ""
 
 #: Sources/Client/Client.cpp:1216 Sources/Gui/UI/InGame/ChatWindow.cpp:607
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:702
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:702 Sources/Client/Client.cpp:1295
 msgctxt "Client"
 msgid "Team"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1226
+#: Sources/Client/Client.cpp:1226 Sources/Client/Client.cpp:1305
 msgctxt "Client"
 msgid "(DEAD)"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1228
+#: Sources/Client/Client.cpp:1228 Sources/Client/Client.cpp:1307
 msgctxt "Client"
 msgid "(SPEC)"
 msgstr ""
 
 #: Sources/Client/Client.cpp:1236 Sources/Client/Client.cpp:1263
+#: Sources/Client/Client.cpp:1315 Sources/Client/Client.cpp:1342
 msgctxt "Client"
 msgid "[Global]"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1309
+#: Sources/Client/Client.cpp:1309 Sources/Client/Client.cpp:1388
 msgctxt "Client"
 msgid "The server"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1444
+#: Sources/Client/Client.cpp:1444 Sources/Client/Client.cpp:1523
 msgctxt "Client"
 msgid "This server does not allow team pings."
 msgstr ""
 
-#: Sources/Client/Client.cpp:1499
+#: Sources/Client/Client.cpp:1499 Sources/Client/Client.cpp:1578
 msgctxt "Client"
 msgid "[PM] "
 msgstr ""
@@ -68,24 +71,25 @@ msgctxt "Client"
 msgid "Set the block color (all values 0-255)"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:135
+#: Sources/Client/Client_Draw.cpp:135 Sources/Client/Client_Draw.cpp:134
 msgctxt "Client"
 msgid "Unbound"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:181
+#: Sources/Client/Client_Draw.cpp:181 Sources/Client/Client_Draw.cpp:180
 #, c++-format
 msgctxt "Client"
 msgid "Sceneshot saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:182
+#: Sources/Client/Client_Draw.cpp:182 Sources/Client/Client_Draw.cpp:181
 #, c++-format
 msgctxt "Client"
 msgid "Screenshot saved: {0}"
 msgstr ""
 
 #: Sources/Client/Client_Draw.cpp:187 Sources/Client/Client_Draw.cpp:192
+#: Sources/Client/Client_Draw.cpp:186 Sources/Client/Client_Draw.cpp:191
 msgctxt "Client"
 msgid "Screenshot failed: "
 msgstr ""
@@ -95,242 +99,242 @@ msgctxt "Client"
 msgid "NOW LOADING"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1088
+#: Sources/Client/Client_Draw.cpp:1088 Sources/Client/Client_Draw.cpp:1087
 msgctxt "Client"
 msgid "YOU ARE MARKED"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1486
+#: Sources/Client/Client_Draw.cpp:1486 Sources/Client/Client_Draw.cpp:1485
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Grab color"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1487
+#: Sources/Client/Client_Draw.cpp:1487 Sources/Client/Client_Draw.cpp:1486
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1489
+#: Sources/Client/Client_Draw.cpp:1489 Sources/Client/Client_Draw.cpp:1488
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate left/right"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1491
+#: Sources/Client/Client_Draw.cpp:1491 Sources/Client/Client_Draw.cpp:1490
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle extended palette"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1499
+#: Sources/Client/Client_Draw.cpp:1499 Sources/Client/Client_Draw.cpp:1498
 #, c++-format
 msgctxt "Client"
 msgid "#{0} / RGB({1}, {2}, {3})"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1548
+#: Sources/Client/Client_Draw.cpp:1548 Sources/Client/Client_Draw.cpp:1547
 #, c++-format
 msgctxt "Client"
 msgid "Accuracy: {0}%"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1552
+#: Sources/Client/Client_Draw.cpp:1552 Sources/Client/Client_Draw.cpp:1551
 #, c++-format
 msgctxt "Client"
 msgid "Kill/Death Ratio: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1553
+#: Sources/Client/Client_Draw.cpp:1553 Sources/Client/Client_Draw.cpp:1552
 #, c++-format
 msgctxt "Client"
 msgid "Kill Streak: {0}, Best: {1}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1554
+#: Sources/Client/Client_Draw.cpp:1554 Sources/Client/Client_Draw.cpp:1553
 #, c++-format
 msgctxt "Client"
 msgid "Melee Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1555
+#: Sources/Client/Client_Draw.cpp:1555 Sources/Client/Client_Draw.cpp:1554
 #, c++-format
 msgctxt "Client"
 msgid "Grenade Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1558
+#: Sources/Client/Client_Draw.cpp:1558 Sources/Client/Client_Draw.cpp:1557
 #, c++-format
 msgctxt "Client"
 msgid "Blocks Placed: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1891
+#: Sources/Client/Client_Draw.cpp:1891 Sources/Client/Client_Draw.cpp:1890
 msgctxt "Client"
 msgid "Reloading"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1899
+#: Sources/Client/Client_Draw.cpp:1899 Sources/Client/Client_Draw.cpp:1898
 #, c++-format
 msgctxt "Client"
 msgid "Press [{0}] to Reload"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2053
+#: Sources/Client/Client_Draw.cpp:2053 Sources/Client/Client_Draw.cpp:2050
 #, c++-format
 msgctxt "Client"
 msgid "You will respawn in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2054
+#: Sources/Client/Client_Draw.cpp:2054 Sources/Client/Client_Draw.cpp:2051
 msgctxt "Client"
 msgid "Waiting for respawn"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2130
+#: Sources/Client/Client_Draw.cpp:2130 Sources/Client/Client_Draw.cpp:2127
 #, c++-format
 msgctxt "Client"
 msgid "Following {0} [#{1}]"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2135
+#: Sources/Client/Client_Draw.cpp:2135 Sources/Client/Client_Draw.cpp:2132
 #, c++-format
 msgctxt "Client"
 msgid "Respawning in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2140
+#: Sources/Client/Client_Draw.cpp:2140 Sources/Client/Client_Draw.cpp:2137
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Cycle camera mode"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2141
+#: Sources/Client/Client_Draw.cpp:2141 Sources/Client/Client_Draw.cpp:2138
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Next/Prev player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2144
+#: Sources/Client/Client_Draw.cpp:2144 Sources/Client/Client_Draw.cpp:2141
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Unfollow"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2147
+#: Sources/Client/Client_Draw.cpp:2147 Sources/Client/Client_Draw.cpp:2144
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Follow a player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2152
+#: Sources/Client/Client_Draw.cpp:2152 Sources/Client/Client_Draw.cpp:2149
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Go up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2154
+#: Sources/Client/Client_Draw.cpp:2154 Sources/Client/Client_Draw.cpp:2151
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Hold to Zoom"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2158
+#: Sources/Client/Client_Draw.cpp:2158 Sources/Client/Client_Draw.cpp:2155
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle player names"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2161
+#: Sources/Client/Client_Draw.cpp:2161 Sources/Client/Client_Draw.cpp:2158
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle ESP"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2169
+#: Sources/Client/Client_Draw.cpp:2169 Sources/Client/Client_Draw.cpp:2166
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Resume"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2170
+#: Sources/Client/Client_Draw.cpp:2170 Sources/Client/Client_Draw.cpp:2167
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Pause"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2171
+#: Sources/Client/Client_Draw.cpp:2171 Sources/Client/Client_Draw.cpp:2168
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Seek +/-5s"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2176
+#: Sources/Client/Client_Draw.cpp:2176 Sources/Client/Client_Draw.cpp:2173
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Speed: {2}x"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2178
+#: Sources/Client/Client_Draw.cpp:2178 Sources/Client/Client_Draw.cpp:2175
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle Demo HUD"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2180
+#: Sources/Client/Client_Draw.cpp:2180 Sources/Client/Client_Draw.cpp:2177
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Select Team/Weapon"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2246
+#: Sources/Client/Client_Draw.cpp:2246 Sources/Client/Client_Draw.cpp:2243
 msgctxt "Client"
 msgid "N"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2246
+#: Sources/Client/Client_Draw.cpp:2246 Sources/Client/Client_Draw.cpp:2243
 msgctxt "Client"
 msgid "NE"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2247
+#: Sources/Client/Client_Draw.cpp:2247 Sources/Client/Client_Draw.cpp:2244
 msgctxt "Client"
 msgid "E"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2247
+#: Sources/Client/Client_Draw.cpp:2247 Sources/Client/Client_Draw.cpp:2244
 msgctxt "Client"
 msgid "SE"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2248
+#: Sources/Client/Client_Draw.cpp:2248 Sources/Client/Client_Draw.cpp:2245
 msgctxt "Client"
 msgid "S"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2248
+#: Sources/Client/Client_Draw.cpp:2248 Sources/Client/Client_Draw.cpp:2245
 msgctxt "Client"
 msgid "SW"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2249
+#: Sources/Client/Client_Draw.cpp:2249 Sources/Client/Client_Draw.cpp:2246
 msgctxt "Client"
 msgid "W"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2249
+#: Sources/Client/Client_Draw.cpp:2249 Sources/Client/Client_Draw.cpp:2246
 msgctxt "Client"
 msgid "NW"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2737
+#: Sources/Client/Client_Draw.cpp:2737 Sources/Client/Client_Draw.cpp:2734
 #, c++-format
 msgctxt "Client"
 msgid "Connecting to {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2743
+#: Sources/Client/Client_Draw.cpp:2743 Sources/Client/Client_Draw.cpp:2740
 msgctxt "Client"
 msgid "[Esc] Cancel"
 msgstr ""
@@ -522,7 +526,7 @@ msgctxt "Client"
 msgid "{0} wins!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:765
+#: Sources/Client/Client_Update.cpp:765 Sources/Client/Client_Update.cpp:764
 #, c++-format
 msgctxt "Client"
 msgid "{0} block"
@@ -530,123 +534,126 @@ msgid_plural "{0} blocks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: Sources/Client/Client_Update.cpp:770
+#: Sources/Client/Client_Update.cpp:770 Sources/Client/Client_Update.cpp:769
 msgctxt "Client"
 msgid "-- blocks"
 msgstr ""
 
 #: Sources/Client/Client_Update.cpp:1276
 #: Sources/Gui/UI/Components/LimboMenu.cpp:67
+#: Sources/Client/Client_Update.cpp:1282
 msgctxt "Client"
 msgid "Rifle"
 msgstr ""
 
 #: Sources/Client/Client_Update.cpp:1277
 #: Sources/Gui/UI/Components/LimboMenu.cpp:68
+#: Sources/Client/Client_Update.cpp:1283
 msgctxt "Client"
 msgid "SMG"
 msgstr ""
 
 #: Sources/Client/Client_Update.cpp:1278
 #: Sources/Gui/UI/Components/LimboMenu.cpp:69
+#: Sources/Client/Client_Update.cpp:1284
 msgctxt "Client"
 msgid "Shotgun"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1282
+#: Sources/Client/Client_Update.cpp:1282 Sources/Client/Client_Update.cpp:1288
 msgctxt "Client"
 msgid "Fall"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1283
+#: Sources/Client/Client_Update.cpp:1283 Sources/Client/Client_Update.cpp:1289
 msgctxt "Client"
 msgid "Melee"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1284
+#: Sources/Client/Client_Update.cpp:1284 Sources/Client/Client_Update.cpp:1290
 msgctxt "Client"
 msgid "Grenade"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1285
+#: Sources/Client/Client_Update.cpp:1285 Sources/Client/Client_Update.cpp:1291
 msgctxt "Client"
 msgid "Headshot"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1286
+#: Sources/Client/Client_Update.cpp:1286 Sources/Client/Client_Update.cpp:1292
 msgctxt "Client"
 msgid "Team Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1287
+#: Sources/Client/Client_Update.cpp:1287 Sources/Client/Client_Update.cpp:1293
 msgctxt "Client"
 msgid "Weapon Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1339
+#: Sources/Client/Client_Update.cpp:1339 Sources/Client/Client_Update.cpp:1345
 msgctxt "Client"
 msgid "Revenge!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1347
+#: Sources/Client/Client_Update.cpp:1347 Sources/Client/Client_Update.cpp:1353
 msgctxt "Client"
 msgid "Dominating!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1378
+#: Sources/Client/Client_Update.cpp:1378 Sources/Client/Client_Update.cpp:1384
 #, c++-format
 msgctxt "Client"
 msgid "You were killed by {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1380
+#: Sources/Client/Client_Update.cpp:1380 Sources/Client/Client_Update.cpp:1386
 #, c++-format
 msgctxt "Client"
 msgid "You have killed {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1576
+#: Sources/Client/Client_Update.cpp:1576 Sources/Client/Client_Update.cpp:1582
 #, c++-format
 msgctxt "Client"
 msgid "You hit {0} from: {1} blocks "
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1596
+#: Sources/Client/Client_Update.cpp:1596 Sources/Client/Client_Update.cpp:1602
 msgctxt "Client"
 msgid "TORSO"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1597
+#: Sources/Client/Client_Update.cpp:1597 Sources/Client/Client_Update.cpp:1603
 msgctxt "Client"
 msgid "ARMS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1598
+#: Sources/Client/Client_Update.cpp:1598 Sources/Client/Client_Update.cpp:1604
 msgctxt "Client"
 msgid "LEGS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1599
+#: Sources/Client/Client_Update.cpp:1599 Sources/Client/Client_Update.cpp:1605
 msgctxt "Client"
 msgid "MELEE"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1600
+#: Sources/Client/Client_Update.cpp:1600 Sources/Client/Client_Update.cpp:1606
 msgctxt "Client"
 msgid "HEAD"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1929
+#: Sources/Client/Client_Update.cpp:1929 Sources/Client/Client_Update.cpp:1935
 msgctxt "Client"
 msgid "You are taking damage. Find solid ground!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1947
+#: Sources/Client/Client_Update.cpp:1947 Sources/Client/Client_Update.cpp:1953
 msgctxt "Client"
 msgid "Insufficient blocks."
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1950
+#: Sources/Client/Client_Update.cpp:1950 Sources/Client/Client_Update.cpp:1956
 msgctxt "Client"
 msgid "You cannot place a block there."
 msgstr ""
@@ -788,6 +795,7 @@ msgid "{0} More"
 msgstr ""
 
 #: Sources/Client/ScoreboardView.cpp:115 Sources/Client/ScoreboardView.cpp:457
+#: Sources/Client/ScoreboardView.cpp:456
 #, c++-format
 msgctxt "Client"
 msgid "Spectator{1}"
@@ -811,27 +819,28 @@ msgctxt "ServerAddress"
 msgid "Localhost"
 msgstr ""
 
-#: Sources/Gui/ConsoleScreen.cpp:190
+#: Sources/Gui/ConsoleScreen.cpp:190 Sources/Gui/ConsoleScreen.cpp:194
 msgctxt "Client"
 msgid "Display all available commands"
 msgstr ""
 
-#: Sources/Gui/ConsoleScreen.cpp:192
+#: Sources/Gui/ConsoleScreen.cpp:192 Sources/Gui/ConsoleScreen.cpp:196
 msgctxt "Client"
 msgid "Clear the GFX (models and images) cache, forcing reload"
 msgstr ""
 
-#: Sources/Gui/ConsoleScreen.cpp:193
+#: Sources/Gui/ConsoleScreen.cpp:193 Sources/Gui/ConsoleScreen.cpp:197
 msgctxt "Client"
 msgid "Clear the SFX cache, forcing reload"
 msgstr ""
 
-#: Sources/Gui/Main.cpp:982
+#: Sources/Gui/Main.cpp:982 Sources/Gui/Main.cpp:947
 msgctxt "Main"
 msgid "Localization System Loaded"
 msgstr ""
 
 #: Sources/Gui/Main.cpp:1060 Sources/Gui/Runner.cpp:56
+#: Sources/Gui/Main.cpp:1025
 #, c++-format
 msgctxt "Main"
 msgid ""
@@ -843,45 +852,47 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/Main.cpp:1068 Sources/Gui/Runner.cpp:62
+#: Sources/Gui/Main.cpp:1033
 msgctxt "Main"
 msgid "ZeroSpades Fatal Error"
 msgstr ""
 
-#: Sources/Gui/MainScreen.cpp:180
+#: Sources/Gui/MainScreen.cpp:180 Sources/Gui/MainScreen.cpp:184
 msgctxt "MainScreen"
 msgid "NOW LOADING"
 msgstr ""
 
-#: Sources/Gui/ModsScreenHelper.cpp:465
+#: Sources/Gui/ModsScreenHelper.cpp:465 Sources/Gui/ModsScreenHelper.cpp:469
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: no download URL"
 msgstr ""
 
-#: Sources/Gui/ModsScreenHelper.cpp:474
+#: Sources/Gui/ModsScreenHelper.cpp:474 Sources/Gui/ModsScreenHelper.cpp:478
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: {1}"
 msgstr ""
 
-#: Sources/Gui/ModsScreenHelper.cpp:482
+#: Sources/Gui/ModsScreenHelper.cpp:482 Sources/Gui/ModsScreenHelper.cpp:486
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: cannot replace (file in use?)"
 msgstr ""
 
 #: Sources/Gui/ModsScreenHelper.cpp:503 Sources/Gui/ModsScreenHelper.cpp:533
+#: Sources/Gui/ModsScreenHelper.cpp:507 Sources/Gui/ModsScreenHelper.cpp:537
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "List '{0}': {1}"
 msgstr ""
 
-#: Sources/Gui/ModsScreenHelper.cpp:509
+#: Sources/Gui/ModsScreenHelper.cpp:509 Sources/Gui/ModsScreenHelper.cpp:513
 msgctxt "ModsScreenHelper"
 msgid "Index parse failed (expected JSON array)"
 msgstr ""
 
-#: Sources/Gui/ModsScreenHelper.cpp:558
+#: Sources/Gui/ModsScreenHelper.cpp:558 Sources/Gui/ModsScreenHelper.cpp:562
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0} pak(s) failed to download:"
@@ -1479,11 +1490,13 @@ msgid "Disable all mods? This takes effect after a restart."
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:894
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:928
 msgctxt "MainScreen"
 msgid "Mod download failed:"
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:932
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:966
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1492,11 +1505,13 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:970
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1004
 msgctxt "MainScreen"
 msgid "Failed to rename demo."
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1192
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1226
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -3895,4 +3910,49 @@ msgstr ""
 #: Sources/Gui/UI/Widgets/MessageBox.cpp:186
 msgctxt "MessageBox"
 msgid "Open this link in your browser?"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:808
+msgctxt "MainScreen"
+msgid "Press 'Apply changes' to apply your mods."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:858
+msgctxt "MainScreen"
+msgid "The game restarts to apply the rest."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:869
+msgctxt "MainScreen"
+msgid "Mods applied."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:885
+msgctxt "MainScreen"
+msgid "Disable all mods? This takes effect on Apply."
+msgstr ""
+
+#: Sources/Gui/ConsoleScreen.cpp:198
+msgctxt "Client"
+msgid "Apply the enabled mods without a restart"
+msgstr ""
+
+#: Sources/Gui/ModOverlay.cpp:162
+msgctxt "ModOverlay"
+msgid "Wait for the mod download to finish."
+msgstr ""
+
+#: Sources/Gui/ModOverlay.cpp:245
+msgctxt "ModOverlay"
+msgid "The mods were not applied:"
+msgstr ""
+
+#: Sources/Gui/ModOverlay.cpp:255
+msgctxt "ModOverlay"
+msgid "These mods failed to load and were disabled:"
+msgstr ""
+
+#: Sources/Gui/ModOverlay.cpp:156
+msgctxt "ModOverlay"
+msgid "Mods can't be applied while trying a mod."
 msgstr ""

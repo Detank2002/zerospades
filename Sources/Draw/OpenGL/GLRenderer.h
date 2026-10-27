@@ -171,10 +171,12 @@ namespace spades {
 			Handle<client::IModel> RegisterModel(const char* filename) override;
 
 			void ClearCache() override;
-			void ReloadResources(const ResourceChanges&) override;
+			std::vector<std::string> GetRegisteredFiles() override;
 
 			Handle<client::IImage> CreateImage(Bitmap&) override;
 			Handle<client::IModel> CreateModel(VoxelModel&) override;
+			void ReplaceImage(client::IImage&, client::IImage&) override;
+			void ReplaceModel(client::IModel&, client::IModel&) override;
 
 			GLProgram* RegisterProgram(const std::string& name);
 			GLShader* RegisterShader(const std::string& name);

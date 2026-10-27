@@ -25,7 +25,6 @@
 #include <vector>
 
 namespace spades {
-	class ResourceChanges;
 	namespace draw {
 		class IGLDevice;
 		class GLImage;
@@ -46,8 +45,8 @@ namespace spades {
 			GLImage* GetWhiteImage();
 
 			void ClearCache();
-			/** Gives the cached images from a changed file their new content. */
-			void ReloadResources(const ResourceChanges&);
+			/** The files the cached images were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

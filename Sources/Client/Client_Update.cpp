@@ -214,10 +214,14 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			// Mods changed the skin scripts: build the players' skins again.
-			for (std::size_t i = 0; i < clientPlayers.size(); i++) {
-				if (clientPlayers[i] && !clientPlayers[i]->HasCurrentSkins())
-					PlayerObjectSet(static_cast<int>(i));
+			for (const auto& clientPlayer : clientPlayers) {
+				if (clientPlayer && !clientPlayer->HasCurrentSkins())
+					clientPlayer->RebuildSkins();
 			}
+
+			// Mods changed the game's assets: the killstreak sounds may differ too.
+			if (killSoundsGeneration != gameResources->GetGeneration())
+				LoadKillSounds();
 
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 

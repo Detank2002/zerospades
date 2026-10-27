@@ -18,10 +18,49 @@
 
  */
 
+#include <mutex>
+#include <set>
+
 #include "ScriptFunction.h"
 #include <Core/Debug.h>
+#include <Core/Strings.h>
 
 namespace spades {
+
+	namespace {
+		// Every ScriptFunction, so a new module can be checked against them all.
+		std::mutex g_functionsMutex;
+		std::set<ScriptFunction*>& GetFunctions() {
+			static std::set<ScriptFunction*> functions;
+			return functions;
+		}
+	} // namespace
+
+	asIScriptFunction* ScriptFunction::Find(asIScriptEngine* eng, asIScriptModule* module,
+	                                        std::string& error) const {
+		eng->SetDefaultNamespace("spades");
+		module->SetDefaultNamespace("spades");
+		if (type.empty()) {
+			asIScriptFunction* f = eng->GetGlobalFunctionByDecl(decl.c_str());
+			if (!f)
+				f = module->GetFunctionByDecl(decl.c_str());
+			if (!f)
+				error = Format("Script function with signature '{0}' not found.", decl);
+			return f;
+		}
+
+		asITypeInfo* typ = eng->GetTypeInfoByName(type.c_str());
+		if (!typ)
+			typ = module->GetTypeInfoByName(type.c_str());
+		if (!typ) {
+			error = Format("Script type '{0}' not found.", type);
+			return nullptr;
+		}
+		asIScriptFunction* f = typ->GetMethodByDecl(decl.c_str());
+		if (!f)
+			error = Format("Script method of '{0}' with signature '{1}' not found.", type, decl);
+		return f;
+	}
 
 	void ScriptFunction::Load(asIScriptEngine* eng) {
 		// Usually a static: look the function up again once the module is rebuilt.
@@ -31,35 +70,39 @@ namespace spades {
 			loadedGeneration = generation;
 		}
 		if (func == NULL) {
-			asIScriptModule* module = eng->GetModule("Client");
-			eng->SetDefaultNamespace("spades");
-			module->SetDefaultNamespace("spades");
-			if (type.empty()) {
-				func = eng->GetGlobalFunctionByDecl(decl.c_str());
-				if (!func)
-					func = module->GetFunctionByDecl(decl.c_str());
-				if (!func)
-					SPRaise("Script function with signature '%s' not found.", decl.c_str());
-			} else {
-				asITypeInfo* typ = eng->GetTypeInfoByName(type.c_str());
-				if (!typ)
-					typ = module->GetTypeInfoByName(type.c_str());
-				if (!typ)
-					SPRaise("Script type '%s' not found.", type.c_str());
-				func = typ->GetMethodByDecl(decl.c_str());
-				if (!func) {
-					SPRaise("Script method of '%s' with signature '%s' not found.", type.c_str(),
-					        decl.c_str());
-				}
-			}
+			std::string error;
+			func = Find(eng, eng->GetModule("Client"), error);
+			if (!func)
+				SPRaise("%s", error.c_str());
 		}
 	}
 
+	std::string ScriptFunction::FindMissing(asIScriptEngine* eng, asIScriptModule* module) {
+		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		for (ScriptFunction* function : GetFunctions()) {
+			std::string error;
+			if (!function->Find(eng, module, error))
+				return error;
+		}
+		return {};
+	}
+
 	ScriptFunction::ScriptFunction(const std::string& decl)
-	    : decl(decl), type(), loadedGeneration(0), func(NULL) {}
+	    : decl(decl), type(), loadedGeneration(0), func(NULL) {
+		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		GetFunctions().insert(this);
+	}
 
 	ScriptFunction::ScriptFunction(const std::string& type, const std::string& decl)
-	    : decl(decl), type(type), loadedGeneration(0), func(NULL) {}
+	    : decl(decl), type(type), loadedGeneration(0), func(NULL) {
+		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		GetFunctions().insert(this);
+	}
+
+	ScriptFunction::~ScriptFunction() {
+		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		GetFunctions().erase(this);
+	}
 
 	ScriptContextHandle ScriptFunction::Prepare() {
 		ScriptContextHandle ctx = ScriptManager::GetInstance()->GetContext();

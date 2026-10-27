@@ -29,6 +29,7 @@
 namespace spades {
 	namespace client {
 		class FontManager;
+		class GameResources;
 	}
 	namespace gui {
 		class MainScreenHelper;
@@ -61,6 +62,8 @@ namespace spades {
 
 			client::IRenderer *GetRenderer() { return &*renderer; }
 			client::IAudioDevice *GetAudioDevice() { return &*audioDevice; }
+			/** The running game's assets, or null when no game runs. */
+			client::GameResources *GetGameResources();
 
 			void MouseEvent(float x, float y) override;
 			void KeyEvent(const std::string &, bool down) override;

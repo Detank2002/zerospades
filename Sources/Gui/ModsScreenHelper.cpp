@@ -98,9 +98,12 @@ namespace spades {
 			}
 			// The enabled set lives here, at the resource root: one mod name per
 			// line, in apply order (bottom wins conflicts). No build stamp — mods
-			// are mounted as a startup overlay, never merged onto disk, so the
-			// base paks can't go stale.
+			// are mounted as an overlay (see ModOverlay), never merged onto disk,
+			// so the base paks can't go stale.
 			constexpr const char* kEnabledFile = "EnabledMods.txt";
+
+			// Refreshes still writing into Mods/, by any helper.
+			std::atomic<int> g_activeRefreshes{0};
 
 			struct CURLDeleter {
 				void operator()(CURL* p) const {
@@ -426,6 +429,7 @@ namespace spades {
 					SPLog("Mods refresh failed: %s", msg.c_str());
 				owner->resultCell.store(std::make_unique<std::string>(msg));
 				owner = nullptr;
+				g_activeRefreshes--;
 			}
 
 			void SetCurrent(const std::string& s) {
@@ -613,6 +617,7 @@ namespace spades {
 			// touches the settings store), then hand the resolved URL to it.
 			HealPersistedModsIndexUrl();
 			query = new RefreshQuery(this, ResolveModsIndexUrl());
+			g_activeRefreshes++;
 			query->Start();
 		}
 
@@ -735,7 +740,7 @@ namespace spades {
 
 		// Enable a mod: drop any existing entry and append it at the end so it is
 		// applied last (and so wins conflicts). Persisted immediately; it takes
-		// effect on the next launch, when the overlay is mounted.
+		// effect when the enabled set is applied (see ModOverlay).
 		void ModsScreenHelper::EnableMod(std::string modName) {
 			std::vector<std::string> list = ReadEnabled();
 			list.erase(std::remove(list.begin(), list.end(), modName), list.end());
@@ -755,26 +760,28 @@ namespace spades {
 			WriteEnabled(modNames);
 		}
 
-		std::vector<std::string>
-		ModsScreenHelper::GetModPakPaths(const std::vector<std::string>& modNames) {
+		std::vector<std::pair<std::string, std::string>>
+		ModsScreenHelper::GetModPaks(const std::vector<std::string>& modNames) {
 			// Resolve the names to pak paths relative to the resource root, in
-			// the given order. Runs at startup before any instance exists, so a
-			// throwaway helper does the directory scan. Names with no matching
-			// mod on disk are skipped.
+			// the given order. A throwaway helper does the directory scan, so this
+			// also runs at startup, before any instance exists. Names with no
+			// matching mod on disk are skipped.
 			Handle<ModsScreenHelper> h = Handle<ModsScreenHelper>::New();
 			h->RebuildModsCache();
-			std::vector<std::string> out;
+			std::vector<std::pair<std::string, std::string>> out;
 			for (const std::string& name : modNames) {
 				const ModEntry* m = h->FindMod(name);
 				if (m == nullptr)
 					continue;
 				for (const std::string& pak : m->paks)
-					out.push_back(m->isFolder
+					out.emplace_back(name, m->isFolder
 						? (std::string(kModsDir) + "/" + m->name + "/" + pak)
 						: (std::string(kModsDir) + "/" + pak));
 			}
 			return out;
 		}
+
+		bool ModsScreenHelper::IsDownloading() { return g_activeRefreshes.load() > 0; }
 
 	} // namespace gui
 } // namespace spades

@@ -951,7 +951,7 @@ int main(int argc, char** argv) {
 
 		// initialize AngelScript
 		SPLog("Initializing script engine");
-		spades::ScriptManager::GetInstance();
+		spades::gui::ModOverlay::StartScripts();
 		pumpEvents();
 
 		ThreadQuantumSetter quantumSetter;

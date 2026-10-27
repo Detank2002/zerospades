@@ -541,11 +541,15 @@ namespace spades {
 		bool MainScreenHelper::IsTryingMod() { return spades::g_tryMod; }
 		void MainScreenHelper::RelaunchForMods() { spades::RelaunchForMods(); }
 
-		ModApplyResult MainScreenHelper::ApplyMods(std::string& error) {
-			if (mainScreen == NULL)
-				return ModApplyResult::NeedsRestart;
+		ModApplyReport MainScreenHelper::ApplyMods() {
+			if (mainScreen == NULL) {
+				ModApplyReport report;
+				report.result = ModApplyResult::Refused;
+				report.error = "The main screen is gone.";
+				return report;
+			}
 			return ModOverlay::Apply(*mainScreen->GetRenderer(), *mainScreen->GetAudioDevice(),
-			                         error);
+			                         mainScreen->GetGameResources());
 		}
 
 		std::string MainScreenHelper::GetPendingErrorMessage() {

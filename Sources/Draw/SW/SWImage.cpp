@@ -23,7 +23,6 @@
 #include "SWImage.h"
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
-#include <Core/ResourceChanges.h>
 
 namespace spades {
 	namespace draw {
@@ -165,20 +164,11 @@ namespace spades {
 
 		void SWImageManager::ClearCache() { images.clear(); }
 
-		void SWImageManager::ReloadResources(const ResourceChanges& changes) {
-			for (const auto& entry : images) {
-				// Gone with a disabled mod: keep what is loaded.
-				if (!changes.Contains(entry.first) ||
-				    !FileManager::FileExists(entry.first.c_str()))
-					continue;
-				try {
-					Handle<Bitmap> bitmap = Bitmap::Load(entry.first);
-					entry.second->Replace(*CreateImage(*bitmap));
-				} catch (const std::exception& ex) {
-					// Broken: keep what is loaded.
-					SPLog("Image '%s' not reloaded: %s", entry.first.c_str(), ex.what());
-				}
-			}
+		std::vector<std::string> SWImageManager::GetFiles() const {
+			std::vector<std::string> files;
+			for (const auto& entry : images)
+				files.push_back(entry.first);
+			return files;
 		}
 	} // namespace draw
 } // namespace spades

@@ -19,23 +19,11 @@
  */
 
 #include <cctype>
-#include <utility>
 
 #include "ResourceChanges.h"
 
 namespace spades {
 	namespace {
-		std::string Normalize(const std::string& path) {
-			std::string out = path;
-			for (char& c : out) {
-				if (c == '\\')
-					c = '/';
-				else
-					c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-			}
-			return out;
-		}
-
 		bool StartsWith(const std::string& s, const char* prefix) {
 			return s.compare(0, std::char_traits<char>::length(prefix), prefix) == 0;
 		}
@@ -44,17 +32,54 @@ namespace spades {
 			std::size_t n = std::char_traits<char>::length(suffix);
 			return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
 		}
+
+		// FileManager serves `foo.weak` as `foo` when nothing has `foo` itself.
+		std::string StripWeak(const std::string& path) {
+			std::string out = path;
+			if (out.size() >= 5) {
+				std::string tail = out.substr(out.size() - 5);
+				for (char& c : tail)
+					c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+				if (tail == ".weak")
+					out.resize(out.size() - 5);
+			}
+			return out;
+		}
 	} // namespace
 
-	void ResourceChanges::Add(const std::string& path) {
+	std::string ResourceChanges::Normalize(const std::string& path) {
+		std::string out = StripWeak(path);
+		for (char& c : out) {
+			if (c == '\\')
+				c = '/';
+			else
+				c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		}
+		return out;
+	}
+
+	ResourceChanges::AssetKind ResourceChanges::GetAssetKind(const std::string& path) {
 		std::string p = Normalize(path);
+
+		if (StartsWith(p, "scripts/"))
+			return AssetKind::Script;
+		if (EndsWith(p, ".kv6"))
+			return AssetKind::Model;
+		if (EndsWith(p, ".meta.json"))
+			return AssetKind::ModelMetadata;
+		if (EndsWith(p, ".png") || EndsWith(p, ".jpg") || EndsWith(p, ".tif") ||
+		    EndsWith(p, ".bmp") || EndsWith(p, ".tga"))
+			return AssetKind::Image;
+		if (EndsWith(p, ".opus") || EndsWith(p, ".ogg") || EndsWith(p, ".wav"))
+			return AssetKind::Sound;
+		return AssetKind::None;
+	}
+
+	void ResourceChanges::Add(const std::string& path) {
 		// Zip files can list their folders too; those hold nothing to reload.
-		if (p.empty() || p.back() == '/')
+		if (path.empty() || path.back() == '/')
 			return;
-		// FileManager serves `foo.weak` as `foo` when nothing has `foo` itself.
-		if (EndsWith(p, ".weak"))
-			p.resize(p.size() - 5);
-		paths.insert(std::move(p));
+		paths.emplace(Normalize(path), StripWeak(path));
 	}
 
 	bool ResourceChanges::Contains(const std::string& path) const {
@@ -65,47 +90,18 @@ namespace spades {
 		std::string prefix = Normalize(dir);
 		if (!prefix.empty() && prefix.back() != '/')
 			prefix += '/';
-		for (const std::string& path : paths) {
-			if (StartsWith(path, prefix.c_str()))
+		for (const auto& path : paths) {
+			if (StartsWith(path.first, prefix.c_str()))
 				return true;
 		}
 		return false;
 	}
 
-	ResourceChanges::ReloadTime ResourceChanges::GetReloadTime() const {
-		for (const std::string& path : paths) {
-			if (GetReloadTime(path) == ReloadTime::Restart)
-				return ReloadTime::Restart;
-		}
-		return ReloadTime::Live;
-	}
-
-	ResourceChanges::ReloadTime ResourceChanges::GetReloadTime(const std::string& path) {
-		std::string p = Normalize(path);
-
-		// Fonts measure and lay out text once, so even their atlas images wait.
-		if (StartsWith(p, "gfx/fonts/") || StartsWith(p, "fonts/"))
-			return ReloadTime::Restart;
-
-		// Voxel models: GLModelManager, SWModelManager.
-		if (EndsWith(p, ".kv6") || EndsWith(p, ".meta.json"))
-			return ReloadTime::Live;
-
-		// Images: GLImageManager, SWImageManager.
-		if (EndsWith(p, ".png") || EndsWith(p, ".jpg") || EndsWith(p, ".jpeg") ||
-		    EndsWith(p, ".tga") || EndsWith(p, ".bmp"))
-			return ReloadTime::Live;
-
-		// Sounds: ALDevice. NullDevice has nothing to reload.
-		if (EndsWith(p, ".opus") || EndsWith(p, ".ogg") || EndsWith(p, ".wav"))
-			return ReloadTime::Live;
-
-		// Scripts: ScriptManager replaces the module, and the game builds the
-		// players' skins again from it.
-		if (StartsWith(p, "scripts/"))
-			return ReloadTime::Live;
-
-		// Shaders, translations, the title map and anything else.
-		return ReloadTime::Restart;
+	std::vector<std::string> ResourceChanges::GetPaths() const {
+		std::vector<std::string> out;
+		out.reserve(paths.size());
+		for (const auto& path : paths)
+			out.push_back(path.second);
+		return out;
 	}
 } // namespace spades

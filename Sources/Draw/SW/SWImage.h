@@ -27,7 +27,6 @@
 #include <Core/Math.h>
 
 namespace spades {
-	class ResourceChanges;
 	namespace draw {
 		class SWImage : public client::IImage {
 			std::vector<uint32_t> bmp;
@@ -89,8 +88,8 @@ namespace spades {
 			Handle<SWImage> GetWhiteImage();
 
 			void ClearCache();
-			/** Gives the cached images from a changed file their new content. */
-			void ReloadResources(const ResourceChanges&);
+			/** The files the cached images were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

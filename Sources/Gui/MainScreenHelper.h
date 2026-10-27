@@ -128,7 +128,7 @@ namespace spades {
 			bool ShouldOpenModsTab();
 			bool IsTryingMod();
 			void RelaunchForMods();
-			ModApplyResult ApplyMods(std::string& error);
+			ModApplyReport ApplyMods();
 		};
 	}
 }

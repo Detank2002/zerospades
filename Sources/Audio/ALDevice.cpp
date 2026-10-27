@@ -33,7 +33,6 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IAudioStream.h>
-#include <Core/ResourceChanges.h>
 #include <Core/Settings.h>
 
 DEFINE_SPADES_SETTING(s_volume, "100");
@@ -839,23 +838,26 @@ namespace spades {
 			chunks.clear();
 		}
 
-		void ALDevice::ReloadResources(const ResourceChanges& changes) {
-			SPADES_MARK_FUNCTION();
+		std::vector<std::string> ALDevice::GetRegisteredFiles() {
+			std::vector<std::string> files;
+			for (const auto& entry : chunks)
+				files.push_back(entry.first);
+			return files;
+		}
 
-			for (const auto& entry : chunks) {
-				// Gone with a disabled mod: keep what is loaded.
-				if (!changes.Contains(entry.first) ||
-				    !FileManager::FileExists(entry.first.c_str()))
-					continue;
-				try {
-					Handle<ALAudioChunk> fresh{CreateChunk(entry.first.c_str()), false};
-					d->StopSourcesPlaying(entry.second->GetHandle());
-					entry.second->Replace(*fresh);
-				} catch (const std::exception& ex) {
-					// Broken: keep what is loaded.
-					SPLog("Sound '%s' not reloaded: %s", entry.first.c_str(), ex.what());
-				}
-			}
+		Handle<client::IAudioChunk> ALDevice::CreateSound(const char* name) {
+			SPADES_MARK_FUNCTION();
+			return {CreateChunk(name), false};
+		}
+
+		void ALDevice::ReplaceSound(client::IAudioChunk& target, client::IAudioChunk& source) {
+			SPADES_MARK_FUNCTION();
+			auto* t = dynamic_cast<ALAudioChunk*>(&target);
+			auto* s = dynamic_cast<ALAudioChunk*>(&source);
+			if (!t || !s)
+				SPInvalidArgument("target/source");
+			d->StopSourcesPlaying(t->GetHandle());
+			t->Replace(*s);
 		}
 
 		void ALDevice::Play(client::IAudioChunk* chunk, const spades::Vector3& origin,

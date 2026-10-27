@@ -25,6 +25,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <Core/RefCountedObject.h>
@@ -77,12 +78,15 @@ namespace spades {
 			// Replace the enabled set, e.g. to go back to the one last mounted.
 			void SetEnabledMods(const std::vector<std::string>& modNames);
 
-			// The ordered pak paths of `modNames` to mount as an overlay, relative
-			// to the resource root (e.g. "Mods/<folder>/<x>.pak"). In the given
-			// order so the caller can prepend each in turn — the last one ends up
-			// on top and wins conflicts. Mods missing from disk are skipped.
-			static std::vector<std::string>
-			GetModPakPaths(const std::vector<std::string>& modNames);
+			// The paks of `modNames` to mount as an overlay, as (mod name, pak
+			// path relative to the resource root, e.g. "Mods/<folder>/<x>.pak").
+			// In the given order, so the last one ends up on top and wins
+			// conflicts. Mods missing from disk are skipped.
+			static std::vector<std::pair<std::string, std::string>>
+			GetModPaks(const std::vector<std::string>& modNames);
+
+			// Whether a refresh is still writing into Mods/.
+			static bool IsDownloading();
 
 		protected:
 			~ModsScreenHelper();

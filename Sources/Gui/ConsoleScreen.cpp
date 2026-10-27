@@ -27,6 +27,8 @@
 #include "ConfigConsoleResponder.h"
 #include "ConsoleHelper.h"
 #include "ConsoleScreen.h"
+#include "MainScreen.h"
+#include <Client/Client.h>
 #include <Gui/ModOverlay.h>
 #include <Gui/UI/Console/ConsoleUI.h>
 #include <Gui/Utils/ConsoleCommand.h>
@@ -199,6 +201,14 @@ namespace spades {
 			}
 		} // namespace
 
+		client::GameResources* ConsoleScreen::GetGameResources() {
+			if (auto* game = dynamic_cast<client::Client*>(subview.GetPointerOrNull()))
+				return &game->GetGameResources();
+			if (auto* mainScreen = dynamic_cast<MainScreen*>(subview.GetPointerOrNull()))
+				return mainScreen->GetGameResources();
+			return nullptr;
+		}
+
 		bool ConsoleScreen::ExecCommand(const Handle<ConsoleCommand>& command) {
 			SPADES_MARK_FUNCTION();
 			if (command->GetName() == CMD_HELP) {
@@ -214,6 +224,8 @@ namespace spades {
 					return true;
 				}
 				renderer->ClearCache();
+				if (client::GameResources* game = GetGameResources())
+					game->ReloadGraphics();
 				return true;
 			} else if (command->GetName() == CMD_CLEARSFXCACHE) {
 				if (command->GetNumArguments() != 0) {
@@ -221,15 +233,25 @@ namespace spades {
 					return true;
 				}
 				audioDevice->ClearCache();
+				if (client::GameResources* game = GetGameResources())
+					game->ReloadSounds();
 				return true;
 			} else if (command->GetName() == CMD_MODSAPPLY) {
 				if (command->GetNumArguments() != 0) {
 					SPLog("Usage: %s (no arguments)", CMD_MODSAPPLY);
 					return true;
 				}
-				std::string error;
-				if (ModOverlay::Apply(*renderer, *audioDevice, error) == ModApplyResult::NeedsRestart)
-					SPLog("This change takes a restart: apply it from the Mods tab.");
+				ModApplyReport report = ModOverlay::Apply(*renderer, *audioDevice, GetGameResources());
+				std::string problems = ModOverlay::Describe(report);
+				if (!problems.empty())
+					SPLog("%s", problems.c_str());
+				switch (report.result) {
+					case ModApplyResult::Applied: SPLog("Mods applied."); break;
+					case ModApplyResult::NeedsRestart:
+						SPLog("The mods are enabled; they take effect when the game restarts.");
+						break;
+					case ModApplyResult::Refused: break;
+				}
 				return true;
 			}
 			return ConfigConsoleResponder::ExecCommand(command) || subview->ExecCommand(command);

@@ -47,7 +47,9 @@ namespace spades {
 			static std::vector<std::string> DeviceList();
 
 			void ClearCache() override;
-			void ReloadResources(const ResourceChanges&) override;
+			std::vector<std::string> GetRegisteredFiles() override;
+			Handle<client::IAudioChunk> CreateSound(const char* name) override;
+			void ReplaceSound(client::IAudioChunk&, client::IAudioChunk&) override;
 
 			void SetGameMap(client::GameMap*) override;
 

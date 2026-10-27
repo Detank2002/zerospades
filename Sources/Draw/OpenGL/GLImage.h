@@ -52,8 +52,8 @@ namespace spades {
 			float GetInvHeight() { return invHeight; }
 
 			void SubImage(Bitmap* bmp, int x, int y);
-			/** Gives the same texture the content and size of `bmp`. */
-			void Replace(Bitmap& bmp);
+			/** Takes the texture of `other`, which gets this image's old one. */
+			void Replace(GLImage& other);
 			void Invalidate();
 
 			void Update(Bitmap& bmp, int x, int y) override { SubImage(&bmp, x, y); }

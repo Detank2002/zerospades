@@ -18,79 +18,74 @@
 
  */
 
+#include <algorithm>
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
-
-#include <zlib.h>
 
 #include "Main.h"
 #include "ModOverlay.h"
 #include "ModsScreenHelper.h"
+#include <Client/GameAssetReload.h>
+#include <Client/GameResources.h>
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Core/Debug.h>
-#include <Core/DynamicMemoryStream.h>
-#include <Core/FileManager.h>
-#include <Core/IStream.h>
+#include <Core/PakOverlay.h>
 #include <Core/ResourceChanges.h>
+#include <Core/Strings.h>
 #include <Core/TMPUtils.h>
-#include <Core/ZipFileSystem.h>
 #include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace gui {
 		namespace {
-			struct MountedPak {
-				std::string id;                  // path and checksum: equal ids, equal files
-				std::unique_ptr<IStream> stream; // the ZipFileSystem doesn't own it
-				ZipFileSystem* fs;               // owned by FileManager
-			};
+			using Layer = PakOverlay::Layer;
 
-			std::vector<MountedPak> g_mountedPaks;
 			std::vector<std::string> g_mountedMods;
+			std::vector<ModFailure> g_startupFailures;
 
-			// The id of the pak each mounted file is read from: the topmost one.
-			std::unordered_map<std::string, std::string> GetWinners() {
-				std::unordered_map<std::string, std::string> winners;
-				for (const MountedPak& pak : g_mountedPaks) {
-					for (const std::string& file : pak.fs->GetAllFiles())
-						winners[file] = pak.id;
-				}
-				return winners;
+			void Remove(std::vector<std::string>& mods, const std::string& mod) {
+				mods.erase(std::remove(mods.begin(), mods.end(), mod), mods.end());
 			}
 
-			// Mounts `mods` in place of what is mounted, the last one on top.
-			void MountSet(const std::vector<std::string>& mods) {
-				for (MountedPak& pak : g_mountedPaks)
-					FileManager::RemoveFileSystem(pak.fs);
-				g_mountedPaks.clear();
-				g_mountedMods = mods;
+			void Remove(PakOverlay::PakSet& paks, const std::string& mod) {
+				paks.erase(std::remove_if(paks.begin(), paks.end(),
+				                          [&](const std::shared_ptr<PakOverlay::Pak>& pak) {
+					                          return pak->GetOwner() == mod;
+				                          }),
+				           paks.end());
+			}
 
-				for (const std::string& path : ModsScreenHelper::GetModPakPaths(mods)) {
+			// Reads the paks of `mods`. A mod with a pak that can't be read goes to
+			// `failures`, and out of `mods`.
+			PakOverlay::PakSet LoadPaks(std::vector<std::string>& mods,
+			                            std::vector<ModFailure>& failures) {
+				PakOverlay::PakSet paks;
+				std::map<std::string, std::string> broken; // mod -> why
+				for (const auto& entry : ModsScreenHelper::GetModPaks(mods)) {
+					if (broken.count(entry.first))
+						continue;
 					try {
-						// Read the whole pak into memory and mount from there, so the
-						// file on disk is never held open. That lets the mod manager
-						// overwrite or delete an enabled pak (for example re-downloading
-						// it) while the game is running.
-						std::string bytes = FileManager::ReadAllBytes(path.c_str());
-						auto stream = stmp::make_unique<DynamicMemoryStream>();
-						stream->Write(bytes.data(), bytes.size());
-						stream->SetPosition(0);
-
-						auto crc = crc32(0, reinterpret_cast<const Bytef*>(bytes.data()),
-						                 static_cast<uInt>(bytes.size()));
-						std::string id = path + "#" + std::to_string(crc);
-
-						auto* fs = new ZipFileSystem(stream.get());
-						FileManager::PrependFileSystem(fs);
-						g_mountedPaks.push_back({std::move(id), std::move(stream), fs});
-						SPLog("Mod pak mounted (in memory): %s", path.c_str());
+						paks.push_back(PakOverlay::Load(entry.second, entry.first));
+						SPLog("Mod pak loaded (in memory): %s", entry.second.c_str());
 					} catch (const std::exception& ex) {
-						SPLog("Mod pak failed to mount: %s: %s", path.c_str(), ex.what());
+						SPLog("Mod pak failed to load: %s: %s", entry.second.c_str(), ex.what());
+						broken[entry.first] = entry.second + ": " + ex.what();
 					}
 				}
+				for (const auto& mod : broken) {
+					Remove(paks, mod.first);
+					Remove(mods, mod.first);
+					failures.push_back({mod.first, mod.second});
+				}
+				return paks;
+			}
+
+			std::string DescribeError(const ResourceLoadError& error) {
+				return error.path.empty() ? error.message : error.path + ": " + error.message;
 			}
 		} // namespace
 
@@ -101,57 +96,166 @@ namespace spades {
 			if (g_tryMod)
 				return;
 
-			MountSet(Handle<ModsScreenHelper>::New()->GetEnabledMods());
+			Handle<ModsScreenHelper> helper = Handle<ModsScreenHelper>::New();
+			std::vector<std::string> mods = helper->GetEnabledMods();
+			std::vector<ModFailure> failures;
+			PakOverlay::SetLayer(Layer::Mods, LoadPaks(mods, failures));
+			g_mountedMods = mods;
+			if (!failures.empty()) {
+				helper->SetEnabledMods(mods);
+				for (ModFailure& failure : failures)
+					g_startupFailures.push_back(std::move(failure));
+			}
 		}
 
-		ModApplyResult ModOverlay::Apply(client::IRenderer& renderer, client::IAudioDevice& audio,
-		                                 std::string& error) {
+		void ModOverlay::StartScripts() {
 			SPADES_MARK_FUNCTION();
 
-			// A file changed if it is now read from another pak, or from none.
-			std::vector<std::string> previous = g_mountedMods;
-			auto before = GetWinners();
-			Mount();
-			auto after = GetWinners();
+			while (true) {
+				try {
+					ScriptManager::GetInstance();
+					return;
+				} catch (const std::exception& ex) {
+					PakOverlay::PakSet paks = PakOverlay::GetLayer(Layer::Mods);
+					std::string culprit;
+					for (auto it = paks.rbegin(); it != paks.rend() && culprit.empty(); ++it) {
+						for (const std::string& file : (*it)->GetFiles()) {
+							if (ResourceChanges::GetAssetKind(file) ==
+							    ResourceChanges::AssetKind::Script) {
+								culprit = (*it)->GetOwner();
+								break;
+							}
+						}
+					}
+					if (culprit.empty())
+						throw;
 
-			ResourceChanges changes;
-			for (const auto& file : before) {
-				auto it = after.find(file.first);
-				if (it == after.end() || it->second != file.second)
-					changes.Add(file.first);
-			}
-			for (const auto& file : after) {
-				if (before.find(file.first) == before.end())
-					changes.Add(file.first);
-			}
-
-			bool live = changes.GetReloadTime() == ResourceChanges::ReloadTime::Live;
-
-			// Build the new scripts first. Ones that don't build would also stop the
-			// next start, so go back to the set that was mounted, on disk too.
-			if (changes.ContainsUnder("Scripts")) {
-				ScriptManager& scripts = *ScriptManager::GetInstance();
-				error = live ? scripts.ReloadScripts() : scripts.CheckScripts();
-				if (!error.empty()) {
-					SPLog("Mods not applied: %s", error.c_str());
-					Handle<ModsScreenHelper>::New()->SetEnabledMods(previous);
-					MountSet(previous);
-					return ModApplyResult::Refused;
+					SPLog("Mod failed to load: %s: %s", culprit.c_str(), ex.what());
+					Remove(paks, culprit);
+					PakOverlay::SetLayer(Layer::Mods, std::move(paks));
+					Remove(g_mountedMods, culprit);
+					Handle<ModsScreenHelper>::New()->SetEnabledMods(g_mountedMods);
+					g_startupFailures.push_back({culprit, ex.what()});
 				}
 			}
+		}
 
-			// What is loaded was built from the previous set, so keep that mounted
-			// until the restart; the enabled set on disk is the new one.
-			if (!live) {
-				MountSet(previous);
-				return ModApplyResult::NeedsRestart;
+		std::vector<ModFailure> ModOverlay::TakeStartupFailures() {
+			std::vector<ModFailure> failures;
+			failures.swap(g_startupFailures);
+			return failures;
+		}
+
+		ModApplyReport ModOverlay::Apply(client::IRenderer& renderer, client::IAudioDevice& audio,
+		                                 client::GameResources* game) {
+			SPADES_MARK_FUNCTION();
+
+			ModApplyReport report;
+			if (g_tryMod) {
+				report.result = ModApplyResult::Refused;
+				report.error = _Tr("ModOverlay", "Mods can't be applied while trying a mod.");
+				return report;
+			}
+			// The download replaces paks on disk while it runs.
+			if (ModsScreenHelper::IsDownloading()) {
+				report.result = ModApplyResult::Refused;
+				report.error = _Tr("ModOverlay", "Wait for the mod download to finish.");
+				return report;
 			}
 
-			// The players' skins are built again from the new scripts by the game.
-			renderer.ReloadResources(changes);
-			audio.ReloadResources(changes);
-			SPLog("Mods applied in place");
-			return ModApplyResult::Applied;
+			Handle<ModsScreenHelper> helper = Handle<ModsScreenHelper>::New();
+			std::vector<std::string> previous = g_mountedMods;
+			std::vector<std::string> target = helper->GetEnabledMods();
+			PakOverlay::PakSet mounted = PakOverlay::GetLayer(Layer::Mods);
+			PakOverlay::PakSet paks = LoadPaks(target, report.failures);
+
+			// Without a game, the changed files are loaded only to check them.
+			Handle<client::GameResources> check;
+			if (!game) {
+				check = Handle<client::GameResources>::New(Handle<client::IRenderer>(renderer),
+				                                           Handle<client::IAudioDevice>(audio));
+				game = check.GetPointerOrNull();
+			}
+
+			// Each round leaves out at least one mod, so this ends.
+			while (true) {
+				ResourceChanges changes = PakOverlay::SetLayer(Layer::Mods, paks);
+
+				std::vector<ResourceLoadError> errors;
+				auto reload = stmp::make_unique<client::GameAssetReload>(*game, changes, errors);
+				if (!errors.empty()) {
+					// Blame the mods the failing files come from, while they are mounted.
+					std::map<std::string, std::string> culprits;
+					bool blameless = false;
+					for (const ResourceLoadError& error : errors) {
+						std::string mod = error.path.empty() ? "" : PakOverlay::GetOwner(error.path);
+						if (mod.empty())
+							blameless = true;
+						else
+							culprits.emplace(mod, DescribeError(error));
+					}
+
+					reload.reset();
+					PakOverlay::SetLayer(Layer::Mods, mounted);
+
+					if (blameless || culprits.empty()) {
+						helper->SetEnabledMods(previous);
+						report.result = ModApplyResult::Refused;
+						report.error = DescribeError(errors.front());
+						SPLog("Mods not applied: %s", report.error.c_str());
+						return report;
+					}
+					for (const auto& culprit : culprits) {
+						SPLog("Mod failed to load: %s: %s", culprit.first.c_str(),
+						      culprit.second.c_str());
+						Remove(paks, culprit.first);
+						Remove(target, culprit.first);
+						report.failures.push_back({culprit.first, culprit.second});
+					}
+					continue;
+				}
+
+				// What the software loaded itself was built from the previous set, so
+				// keep that mounted until the restart; the enabled set is the new one.
+				if (!client::GameAssetReload::GetSoftwareChanges(changes, renderer, audio)
+				       .empty()) {
+					reload.reset();
+					PakOverlay::SetLayer(Layer::Mods, mounted);
+					helper->SetEnabledMods(target);
+					report.result = ModApplyResult::NeedsRestart;
+					return report;
+				}
+
+				reload->Commit();
+				g_mountedMods = target;
+				helper->SetEnabledMods(target);
+				SPLog("Mods applied in place");
+				report.result = ModApplyResult::Applied;
+				return report;
+			}
+		}
+
+		bool ModOverlay::HasPendingChanges() {
+			return Handle<ModsScreenHelper>::New()->GetEnabledMods() != g_mountedMods;
+		}
+
+		std::string ModOverlay::Describe(const ModApplyReport& report) {
+			std::string text;
+			if (report.result == ModApplyResult::Refused)
+				text = _Tr("ModOverlay", "The mods were not applied:") + "\n" + report.error;
+			std::string failures = Describe(report.failures);
+			if (!failures.empty())
+				text += (text.empty() ? "" : "\n\n") + failures;
+			return text;
+		}
+
+		std::string ModOverlay::Describe(const std::vector<ModFailure>& failures) {
+			if (failures.empty())
+				return {};
+			std::string text = _Tr("ModOverlay", "These mods failed to load and were disabled:");
+			for (const ModFailure& failure : failures)
+				text += "\n- " + failure.mod + ": " + failure.reason;
+			return text;
 		}
 	} // namespace gui
 } // namespace spades

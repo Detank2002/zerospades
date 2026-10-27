@@ -19,6 +19,7 @@
 
  */
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +28,7 @@
 
 #include "Client.h"
 #include "Fonts.h"
+#include "GameAssetReload.h"
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Settings.h>
@@ -86,8 +88,11 @@ namespace spades {
 			  playerName(StripNewlines(cg_playerName.operator std::string()).substr(0, 15)),
 			  logStream(nullptr),
 			  hostname(host),
-			  renderer(r),
-			  audioDevice(audioDev),
+			  shellRenderer(r),
+			  shellAudioDevice(audioDev),
+			  gameResources(Handle<GameResources>::New(r, audioDev)),
+			  renderer(gameResources->CreateRenderer()),
+			  audioDevice(gameResources->CreateAudioDevice()),
 
 			  time(0.0F),
 			  readyToClose(false),
@@ -164,7 +169,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
-			cursor = stmp::make_unique<gui::SoftwareCursor>(*renderer);
+			cursor = stmp::make_unique<gui::SoftwareCursor>(*shellRenderer);
 
 			// Create LimboMenu host adapter
 			class ClientLimboHost : public gui::ILimboMenuHost {
@@ -191,11 +196,11 @@ namespace spades {
 
 			auto hostAdapter = Handle<ClientLimboHost>::New(this);
 			limboMenu = stmp::make_unique<gui::LimboMenu>(
-				Handle<gui::ILimboMenuHost>(hostAdapter.GetPointerOrNull()), *renderer,
+				Handle<gui::ILimboMenuHost>(hostAdapter.GetPointerOrNull()), *shellRenderer,
 				*fontManager, *cursor);
 			teamplay = stmp::make_unique<Teamplay>();
-			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
-				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
+			scriptedUI = Handle<ClientUI>::New(shellRenderer.GetPointerOrNull(),
+				shellAudioDevice.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
 			renderer->SetGameMap(nullptr);
 		}
@@ -327,6 +332,8 @@ namespace spades {
 
 		Client::~Client() {
 			SPADES_MARK_FUNCTION();
+
+			UnloadGameMods();
 
 			NetLog("Disconnecting");
 
@@ -1203,7 +1210,80 @@ namespace spades {
 			CloseLimboView();
 		}
 
+		std::string Client::LoadGameMod(const std::string& path) {
+			SPADES_MARK_FUNCTION();
+
+			std::shared_ptr<PakOverlay::Pak> pak;
+			try {
+				pak = PakOverlay::Load(path, path);
+			} catch (const std::exception& ex) {
+				return ex.what();
+			}
+			PakOverlay::PakSet paks = PakOverlay::GetLayer(PakOverlay::Layer::Game);
+			paks.push_back(std::move(pak));
+			return SetGameMods(std::move(paks));
+		}
+
+		std::string Client::UnloadGameMod(const std::string& path) {
+			SPADES_MARK_FUNCTION();
+
+			PakOverlay::PakSet paks = PakOverlay::GetLayer(PakOverlay::Layer::Game);
+			auto it = std::find_if(paks.begin(), paks.end(),
+			                       [&](const std::shared_ptr<PakOverlay::Pak>& pak) {
+				                       return pak->GetOwner() == path;
+			                       });
+			if (it == paks.end())
+				return Format("No mod is loaded from '{0}'.", path);
+			paks.erase(it);
+			return SetGameMods(std::move(paks));
+		}
+
+		std::string Client::SetGameMods(PakOverlay::PakSet paks) {
+			SPADES_MARK_FUNCTION();
+
+			PakOverlay::PakSet previous = PakOverlay::GetLayer(PakOverlay::Layer::Game);
+			ResourceChanges changes = PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(paks));
+
+			// These mods last a game, so they can't touch what only a restart reloads.
+			std::vector<std::string> software =
+			  GameAssetReload::GetSoftwareChanges(changes, *shellRenderer, *shellAudioDevice);
+			if (!software.empty()) {
+				PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(previous));
+				return Format("A mod loaded in game can only change game assets, not '{0}'.",
+				              software.front());
+			}
+
+			std::vector<ResourceLoadError> errors;
+			GameAssetReload reload(*gameResources, changes, errors);
+			if (!errors.empty()) {
+				PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(previous));
+				const ResourceLoadError& error = errors.front();
+				return error.path.empty() ? error.message : error.path + ": " + error.message;
+			}
+			reload.Commit();
+			return {};
+		}
+
+		void Client::UnloadGameMods() {
+			SPADES_MARK_FUNCTION();
+
+			if (PakOverlay::GetLayer(PakOverlay::Layer::Game).empty())
+				return;
+
+			// The game ends either way: put back what can be, and log the rest.
+			ResourceChanges changes = PakOverlay::SetLayer(PakOverlay::Layer::Game, {});
+			std::vector<ResourceLoadError> errors;
+			GameAssetReload reload(*gameResources, changes, errors);
+			for (const ResourceLoadError& error : errors)
+				SPLog("Game mod not fully unloaded: %s: %s", error.path.c_str(),
+				      error.message.c_str());
+			reload.Commit();
+		}
+
 		void Client::LoadKillSounds() {
+			killSounds.clear();
+			killSoundsGeneration = gameResources->GetGeneration();
+
 			// list available sounds in the directory
 			auto files = FileManager::EnumFiles("Sounds/Feedback/Killstreak");
 			for (const auto& file : files) {

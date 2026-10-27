@@ -138,7 +138,7 @@ namespace spades {
 			ui::Label* modsStatusLabel;
 			ModsProgressBar* modsProgressBar;
 			bool modsDownloading = false;
-			bool modsDirty = false; // enabled set changed this session; restart to apply
+			bool modsDirty = false; // paks changed on disk this session (a download)
 			float modsCheckColWidth;
 			float modsOrderColWidth;
 			float modsTagColWidth;
@@ -152,6 +152,9 @@ namespace spades {
 			void OnDownloadModsPressed(ui::UIElement& sender);
 			void OnDownloadConfirmed(ui::UIElement& sender);
 			void OnApplyModsPressed(ui::UIElement& sender);
+			/** Whether Apply has something to do: the enabled set or its paks changed. */
+			bool HasPendingMods();
+			void ShowModProblems(const std::string& text);
 			void OnResetModsPressed(ui::UIElement& sender);
 			void OnResetConfirmed(ui::UIElement& sender);
 			void OnModToggle(const std::string& modName);

@@ -21,6 +21,8 @@
 #pragma once
 
 #include <array>
+#include <string>
+#include <vector>
 
 #include "IImage.h"
 #include "IModel.h"
@@ -30,7 +32,6 @@
 
 namespace spades {
 	class Bitmap;
-	class ResourceChanges;
 	class VoxelModel;
 	namespace client {
 		class GameMap;
@@ -144,15 +145,19 @@ namespace spades {
 			 */
 			virtual void ClearCache() {}
 
-			/**
-			 * Reloads, in place, the models and images loaded via `RegisterModel`
-			 * and `RegisterImage` from a file in `changes`, so their holders see the
-			 * new content. One that fails to load keeps its old content.
-			 */
-			virtual void ReloadResources(const ResourceChanges& changes) {}
+			/** The files the models and images loaded via `RegisterModel` and
+			 * `RegisterImage` come from. */
+			virtual std::vector<std::string> GetRegisteredFiles() = 0;
 
 			virtual Handle<IImage> CreateImage(Bitmap&) = 0;
 			virtual Handle<IModel> CreateModel(VoxelModel&) = 0;
+
+			/**
+			 * Gives `target` the content of `source`, which gets the old one, so the
+			 * holders of `target` draw the new content. Both come from this renderer.
+			 */
+			virtual void ReplaceImage(IImage& target, IImage& source) = 0;
+			virtual void ReplaceModel(IModel& target, IModel& source) = 0;
 
 			/**
 			 * Returns a shared 1x1 opaque white image.

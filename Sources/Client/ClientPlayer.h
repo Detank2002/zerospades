@@ -76,6 +76,8 @@ namespace spades {
 			std::uint64_t skinScriptGeneration;
 
 			asIScriptObject* GetCurrentSkin(bool viewSkin);
+			/** Builds the skins from the current scripts. */
+			void CreateSkins();
 
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
@@ -107,10 +109,15 @@ namespace spades {
 			ClientPlayer(Player& p, Client&);
 			Player& GetPlayer() const { return player; }
 
-			/** False once the skin scripts were reloaded: the skins are then rebuilt. */
+			/** False once the skin scripts were reloaded, until `RebuildSkins`. */
 			bool HasCurrentSkins() const {
 				return skinScriptGeneration == ScriptManager::GetInstance()->GetGeneration();
 			}
+			/**
+			 * Builds the skins again from the reloaded scripts. The rest of the
+			 * player's state, such as its animations, stays as it is.
+			 */
+			void RebuildSkins();
 
 			void Update(float dt);
 			void AddToScene();

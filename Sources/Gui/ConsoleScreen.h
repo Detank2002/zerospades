@@ -28,6 +28,7 @@
 namespace spades {
 	namespace client {
 		class FontManager;
+		class GameResources;
 	}
 	namespace gui {
 		class ConsoleHelper;
@@ -73,6 +74,8 @@ namespace spades {
 			Handle<ConsoleHelper> helper;
 			std::unique_ptr<ConsoleUI> ui;
 			bool ShouldInterceptInput();
+			/** The running game's assets, or null when no game runs. */
+			client::GameResources* GetGameResources();
 			void ToggleConsole();
 			void AddLine(const std::string&);
 

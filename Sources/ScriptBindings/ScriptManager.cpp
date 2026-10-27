@@ -24,6 +24,7 @@
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Strings.h>
+#include <ScriptBindings/ScriptFunction.h>
 #include <sstream>
 #include <vector>
 
@@ -35,7 +36,15 @@ namespace spades {
 		return m;
 	}
 
-	// `param` is null, or a `std::string` that receives the first error.
+	namespace {
+		// What MessageCallback keeps of the first error of a build.
+		struct BuildError {
+			std::string message;
+			std::string section; // the script, as "/Skin/Foo.as"
+		};
+	} // namespace
+
+	// `param` is null, or a `BuildError` that receives the first error.
 	static void MessageCallback(const asSMessageInfo* msg, void* param) {
 		SPADES_MARK_FUNCTION();
 		const char* type = "ERR ";
@@ -45,10 +54,12 @@ namespace spades {
 			type = "INFO";
 		SPLog("%s (%d, %d) : %s : %s\n", msg->section, msg->row, msg->col, type, msg->message);
 
-		auto* firstError = static_cast<std::string*>(param);
-		if (firstError && firstError->empty() && msg->type == asMSGTYPE_ERROR)
-			*firstError = Format("{0} ({1}, {2}): {3}", msg->section, msg->row, msg->col,
-			                     msg->message);
+		auto* firstError = static_cast<BuildError*>(param);
+		if (firstError && firstError->message.empty() && msg->type == asMSGTYPE_ERROR) {
+			firstError->message =
+			  Format("{0} ({1}, {2}): {3}", msg->section, msg->row, msg->col, msg->message);
+			firstError->section = msg->section;
+		}
 	}
 
 	// Helper function to normalize paths (resolve .. and .)
@@ -198,46 +209,54 @@ namespace spades {
 			SPRaise("Failed to build at least one of the scripts.");
 	}
 
-	std::string ScriptManager::TryBuildModule(const char* name) {
+	static constexpr const char* kNextModule = "ClientNext";
+
+	std::string ScriptManager::PrepareReload(std::string& errorFile) {
 		SPADES_MARK_FUNCTION();
 
-		std::string firstError;
-		engine->SetMessageCallback(asFUNCTION(MessageCallback), &firstError, asCALL_CDECL);
+		DiscardReload();
+		errorFile.clear();
+
+		BuildError error;
+		engine->SetMessageCallback(asFUNCTION(MessageCallback), &error, asCALL_CDECL);
 		try {
-			BuildModule(name);
+			BuildModule(kNextModule);
 		} catch (const std::exception& ex) {
-			if (firstError.empty())
-				firstError = ex.what();
+			if (error.message.empty())
+				error.message = ex.what();
 		}
 		engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
-		if (!firstError.empty())
-			engine->DiscardModule(name);
-		return firstError;
+
+		// The game calls into the module by these; the new one must have them all.
+		if (error.message.empty())
+			error.message = ScriptFunction::FindMissing(engine, engine->GetModule(kNextModule));
+
+		if (!error.message.empty()) {
+			DiscardReload();
+			if (!error.section.empty())
+				errorFile = "Scripts" + error.section;
+		}
+		return error.message;
 	}
 
-	std::string ScriptManager::CheckScripts() {
+	void ScriptManager::CommitReload() {
 		SPADES_MARK_FUNCTION();
 
-		std::string error = TryBuildModule("ClientCheck");
-		if (error.empty())
-			engine->DiscardModule("ClientCheck");
-		return error;
-	}
-
-	std::string ScriptManager::ReloadScripts() {
-		SPADES_MARK_FUNCTION();
-
-		std::string error = TryBuildModule("ClientNext");
-		if (!error.empty())
-			return error;
+		asIScriptModule* next = engine->GetModule(kNextModule);
+		if (!next)
+			SPRaise("No scripts were prepared.");
 
 		// Objects made by the old module, such as the skins of the players in a
 		// game, keep its code alive until they are released.
 		engine->DiscardModule("Client");
-		engine->GetModule("ClientNext")->SetName("Client");
+		next->SetName("Client");
 		generation++;
 		SPLog("Scripts reloaded");
-		return error;
+	}
+
+	void ScriptManager::DiscardReload() {
+		if (engine->GetModule(kNextModule))
+			engine->DiscardModule(kNextModule);
 	}
 
 	static std::string ASErrorToString(int ret) {

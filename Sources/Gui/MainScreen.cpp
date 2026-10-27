@@ -55,6 +55,11 @@ namespace spades {
 			timeToStartInitialization = 1000.0F;
 		}
 
+		client::GameResources* MainScreen::GetGameResources() {
+			auto* game = dynamic_cast<client::Client*>(subview.GetPointerOrNull());
+			return game ? &game->GetGameResources() : nullptr;
+		}
+
 		MainScreen::~MainScreen() {
 			SPADES_MARK_FUNCTION();
 			helper->MainScreenDestroyed();

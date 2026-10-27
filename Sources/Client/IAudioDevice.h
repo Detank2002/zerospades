@@ -20,11 +20,13 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
-	class ResourceChanges;
 	namespace client {
 		class IAudioChunk;
 		class GameMap;
@@ -54,12 +56,17 @@ namespace spades {
 			 */
 			virtual void ClearCache() {}
 
+			/** The files the chunks loaded via `RegisterSound` come from. */
+			virtual std::vector<std::string> GetRegisteredFiles() = 0;
+
+			/** Loads `name` into a new chunk, outside the `RegisterSound` cache. */
+			virtual Handle<IAudioChunk> CreateSound(const char* name) = 0;
+
 			/**
-			 * Reloads, in place, the chunks loaded via `RegisterSound` from a file in
-			 * `changes`, so their holders play the new sound. One that fails to load
-			 * keeps its old sound.
+			 * Gives `target` the sound of `source`, which gets the old one, so the
+			 * holders of `target` play the new sound. Both come from this device.
 			 */
-			virtual void ReloadResources(const ResourceChanges& changes) {}
+			virtual void ReplaceSound(IAudioChunk& target, IAudioChunk& source) = 0;
 
 			virtual void SetGameMap(GameMap*) = 0;
 

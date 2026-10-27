@@ -60,8 +60,6 @@ namespace spades {
 
 		/** Builds `Scripts/Main.as`, and what it includes, into a new module. */
 		void BuildModule(const char* name);
-		/** `BuildModule`, returning the first error instead of raising. */
-		std::string TryBuildModule(const char* name);
 
 	public:
 		static ScriptManager* GetInstance();
@@ -69,19 +67,21 @@ namespace spades {
 		static void CheckError(int);
 
 		/**
-		 * Builds the scripts as they are mounted now into a scratch module, then
-		 * discards it. Returns the first error, or "" if they build.
+		 * Builds the scripts as they are mounted now into a module that waits
+		 * beside "Client", and checks it has every function the game looked up
+		 * in "Client". Returns the first error, or "" if it is ready; on an error
+		 * in a script, `errorFile` names it (as "Scripts/Skin/Foo.as").
 		 */
-		std::string CheckScripts();
-
+		std::string PrepareReload(std::string& errorFile);
 		/**
-		 * Builds the scripts as they are mounted now and, if they build, puts them
-		 * in place of the module "Client". Returns the first error, or "" on
-		 * success. What the old module made keeps working until it is released.
+		 * Puts the prepared module in place of "Client". What the old module made
+		 * keeps working until it is released.
 		 */
-		std::string ReloadScripts();
+		void CommitReload();
+		/** Drops the prepared module, if there is one. */
+		void DiscardReload();
 
-		/** Changes each time `ReloadScripts` replaces the module. */
+		/** Changes each time `CommitReload` replaces the module. */
 		std::uint64_t GetGeneration() const { return generation; }
 
 		asIScriptEngine* GetEngine() const { return engine; }

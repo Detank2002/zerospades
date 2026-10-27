@@ -777,7 +777,7 @@ namespace spades {
 			if (modsApplyButton != nullptr) {
 				// Toggles already persist; Apply makes pending changes live, so
 				// it's actionable only when something changed.
-				modsApplyButton->enable = modsDirty && !modsDownloading;
+				modsApplyButton->enable = HasPendingMods() && !modsDownloading;
 			}
 			if (modsDownloading) {
 				int done = modsHelper->GetRefreshDone();
@@ -803,7 +803,7 @@ namespace spades {
 				modsStatusLabel->text = msg;
 				return;
 			}
-			if (modsDirty) {
+			if (HasPendingMods()) {
 				modsStatusLabel->text =
 				    _Tr("MainScreen", "Press 'Apply changes' to apply your mods.");
 				return;
@@ -845,27 +845,39 @@ namespace spades {
 		void MainScreenMainMenu::OnApplyModsPressed(UIElement&) {
 			if (modsDownloading)
 				return;
-			std::string error;
-			switch (helper->ApplyMods(error)) {
-				case ModApplyResult::Applied:
-					modsDirty = false;
-					LoadModList();
-					modsStatusLabel->text = _Tr("MainScreen", "Mods applied.");
-					break;
-				case ModApplyResult::NeedsRestart: helper->RelaunchForMods(); break;
-				case ModApplyResult::Refused: {
-					// The previous set is enabled again, so nothing is pending.
-					modsDirty = false;
-					LoadModList();
-					Handle<AlertScreen> al = Handle<AlertScreen>::New(
-					    this,
-					    _Tr("MainScreen", "These mods were not applied: their scripts don't build.") +
-					      "\n\n" + error,
-					    200.0F, true);
-					al->Run();
-					break;
+			ModApplyReport report = helper->ApplyMods();
+			std::string problems = ModOverlay::Describe(report);
+
+			// Mods that failed are disabled again: tell the user before a restart.
+			if (report.result == ModApplyResult::NeedsRestart) {
+				if (problems.empty()) {
+					helper->RelaunchForMods();
+					return;
 				}
+				Handle<AlertScreen> al = Handle<AlertScreen>::New(
+				    this, problems + "\n\n" + _Tr("MainScreen", "The game restarts to apply the rest."),
+				    200.0F, true);
+				al->closed = [this](UIElement&) { helper->RelaunchForMods(); };
+				al->Run();
+				return;
 			}
+
+			// Applied, or refused with the previous set enabled again: nothing waits.
+			modsDirty = false;
+			LoadModList();
+			if (report.result == ModApplyResult::Applied)
+				modsStatusLabel->text = _Tr("MainScreen", "Mods applied.");
+			if (!problems.empty())
+				ShowModProblems(problems);
+		}
+
+		bool MainScreenMainMenu::HasPendingMods() {
+			return modsDirty || ModOverlay::HasPendingChanges();
+		}
+
+		void MainScreenMainMenu::ShowModProblems(const std::string& text) {
+			Handle<AlertScreen> al = Handle<AlertScreen>::New(this, text, 200.0F, true);
+			al->Run();
 		}
 
 		void MainScreenMainMenu::OnResetModsPressed(UIElement&) {
@@ -881,7 +893,6 @@ namespace spades {
 			if (cs == nullptr || !cs->GetResult())
 				return;
 			modsHelper->ClearEnabledMods();
-			modsDirty = true;
 			// Refresh the rows to clear every checkbox, not just the status line.
 			LoadModList();
 		}
@@ -896,7 +907,6 @@ namespace spades {
 				modsHelper->DisableMod(modName);
 			else
 				modsHelper->EnableMod(modName);
-			modsDirty = true;
 			LoadModList();
 		}
 
@@ -905,6 +915,9 @@ namespace spades {
 				return;
 			if (modsHelper->PollRefreshState()) {
 				modsDownloading = false;
+				// The download may have replaced enabled paks: let Apply pick them up.
+				if (!modsHelper->GetEnabledMods().empty())
+					modsDirty = true;
 				LoadModList();
 				// A non-empty refresh message means the download failed. The
 				// status label keeps it (sticky), but also raise a loud alert so
@@ -1220,6 +1233,11 @@ namespace spades {
 					    Handle<AlertScreen>::New(this, msg, 200.0F, true, true);
 					al->Run();
 				}
+
+				// Mods disabled at startup because they failed to load.
+				std::string modProblems = ModOverlay::Describe(ModOverlay::TakeStartupFailures());
+				if (!modProblems.empty())
+					ShowModProblems(modProblems);
 			}
 		}
 	} // namespace gui

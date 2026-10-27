@@ -156,9 +156,11 @@ namespace spades {
 
 			Handle<client::IImage> CreateImage(Bitmap &) override;
 			Handle<client::IModel> CreateModel(VoxelModel &) override;
+			void ReplaceImage(client::IImage &, client::IImage &) override;
+			void ReplaceModel(client::IModel &, client::IModel &) override;
 
 			void ClearCache() override;
-			void ReloadResources(const ResourceChanges&) override;
+			std::vector<std::string> GetRegisteredFiles() override;
 
 			bool IsRendererSW() const override { return true; }
 

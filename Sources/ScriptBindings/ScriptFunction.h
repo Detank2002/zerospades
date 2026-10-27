@@ -30,10 +30,20 @@ namespace spades {
 		std::uint64_t loadedGeneration; // ScriptManager::GetGeneration() of `func`
 		asIScriptFunction* func;
 		void Load(asIScriptEngine*);
+		/** This function in `module`, or null with `error` saying why. */
+		asIScriptFunction* Find(asIScriptEngine*, asIScriptModule* module,
+		                        std::string& error) const;
 
 	public:
 		ScriptFunction(const std::string& decl);
 		ScriptFunction(const std::string& objectTypeName, const std::string& decl);
+		~ScriptFunction();
+		ScriptFunction(const ScriptFunction&) = delete;
+		void operator=(const ScriptFunction&) = delete;
+
 		ScriptContextHandle Prepare();
+
+		/** Why `module` lacks a function some ScriptFunction looks up, or "". */
+		static std::string FindMissing(asIScriptEngine*, asIScriptModule* module);
 	};
 } // namespace spades

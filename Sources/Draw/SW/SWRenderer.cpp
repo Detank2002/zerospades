@@ -162,11 +162,13 @@ namespace spades {
 			modelManager->ClearCache();
 		}
 
-		void SWRenderer::ReloadResources(const ResourceChanges& changes) {
+		std::vector<std::string> SWRenderer::GetRegisteredFiles() {
 			SPADES_MARK_FUNCTION();
 			EnsureValid();
-			imageManager->ReloadResources(changes);
-			modelManager->ReloadResources(changes);
+			std::vector<std::string> files = imageManager->GetFiles();
+			for (std::string& file : modelManager->GetFiles())
+				files.push_back(std::move(file));
+			return files;
 		}
 
 		Handle<client::IImage> SWRenderer::CreateImage(spades::Bitmap& bmp) {
@@ -179,6 +181,24 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			EnsureInitialized();
 			return modelManager->CreateModel(model).Cast<client::IModel>();
+		}
+
+		void SWRenderer::ReplaceImage(client::IImage& target, client::IImage& source) {
+			SPADES_MARK_FUNCTION();
+			auto* t = dynamic_cast<SWImage*>(&target);
+			auto* s = dynamic_cast<SWImage*>(&source);
+			if (!t || !s)
+				SPInvalidArgument("target/source");
+			t->Replace(*s);
+		}
+
+		void SWRenderer::ReplaceModel(client::IModel& target, client::IModel& source) {
+			SPADES_MARK_FUNCTION();
+			auto* t = dynamic_cast<SWModel*>(&target);
+			auto* s = dynamic_cast<SWModel*>(&source);
+			if (!t || !s)
+				SPInvalidArgument("target/source");
+			t->Replace(*s);
 		}
 
 		void SWRenderer::SetGameMap(stmp::optional<client::GameMap&> map) {
