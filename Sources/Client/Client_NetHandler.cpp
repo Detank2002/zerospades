@@ -149,7 +149,8 @@ namespace spades {
 			std::string osInfo = VersionInfo::GetVersionInfo();
 			std::string archInfo = VersionInfo::GetAppArchitecture();
 			std::string s = _Tr("Client", "You are connected with {0} ({2}) on {1}", verStr, osInfo, archInfo);
-			chatWindow->AddMessage(ChatWindow::ColoredMessage(s, MsgColorSysInfo));
+			s = ChatWindow::ColoredMessage(s, MsgColorSysInfo);
+			chatWindow->AddMessage(s);
 			scriptedUI->RecordChatLog(s, chatWindow->GetColor(MsgColorSysInfo));
 
 			// start recording if auto-record is enabled
@@ -381,21 +382,13 @@ namespace spades {
 				}
 			}
 
-			std::string msg;
-			{
-				msg = _Tr("Client", "Player {0} has left", p.GetName());
-				if (wasDominated)
-					msg += _Tr("Client", " (ragequit)");
-				NetLog("%s", msg.c_str());
-				scriptedUI->RecordChatLog(msg, ConvertColorRGBA(p.GetColor()));
-			}
-			{
-				msg = chatWindow->TeamColorMessage(p.GetName(), p.GetTeamId());
-				msg = _Tr("Client", "Player {0} has left", msg);
-				if (wasDominated)
-					msg += _Tr("Client", " (ragequit)");
-				chatWindow->AddMessage(msg);
-			}
+			std::string msg = _Tr("Client", "Player {0} has left",
+								  chatWindow->TeamColorMessage(p.GetName(), p.GetTeamId()));
+			if (wasDominated)
+				msg += _Tr("Client", " (ragequit)");
+			NetLog("%s", ChatWindow::StripFormatting(msg).c_str());
+			scriptedUI->RecordChatLog(msg, ConvertColorRGBA(p.GetColor()));
+			chatWindow->AddMessage(msg);
 
 			// remove player streaks from the killStreaks map
 			for (auto it = killStreaks.begin(); it != killStreaks.end();) {
@@ -423,16 +416,11 @@ namespace spades {
 				return;
 			}
 
-			{
-				msg = _Tr("Client", "{0} joined {1} team", p.GetName(), teamName);
-				NetLog("%s", msg.c_str());
-				scriptedUI->RecordChatLog(msg, ConvertColorRGBA(p.GetColor()));
-			}
-			{
-				msg = chatWindow->TeamColorMessage(teamName, p.GetTeamId());
-				msg = _Tr("Client", "{0} joined {1} team", p.GetName(), msg);
-				chatWindow->AddMessage(msg);
-			}
+			msg = _Tr("Client", "{0} joined {1} team", p.GetName(),
+					  chatWindow->TeamColorMessage(teamName, p.GetTeamId()));
+			NetLog("%s", ChatWindow::StripFormatting(msg).c_str());
+			scriptedUI->RecordChatLog(msg, ConvertColorRGBA(p.GetColor()));
+			chatWindow->AddMessage(msg);
 		}
 
 		void Client::PlayerSpawned(Player& p) {

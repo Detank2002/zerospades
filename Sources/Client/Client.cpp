@@ -1320,55 +1320,32 @@ namespace spades {
 				state = _Tr("Client", "(SPEC)");
 			}
 
-			{
-				std::string s;
+			std::string s;
 
-				// add prefix
-				if (global) {
-					s += _Tr("Client", "[Global]");
-					s += " ";
-				}
-
-				// add player name
-				s += playerNameStr;
-
-				// add player state
-				if (!state.empty()) {
-					s += " ";
-					s += state;
-				}
-
-				s += ": ";
-				s += msg;
-				scriptedUI->RecordChatLog(s, ConvertColorRGBA(p.GetColor()));
+			// add prefix
+			if (global) {
+				s += _Tr("Client", "[Global]");
+				s += " ";
 			}
+
+			// add player name (team-colored)
+			s += ChatWindow::TeamColorMessage(playerNameStr, p.GetTeamId());
+
+			// add player state
+			if (!state.empty()) {
+				s += " ";
+				s += state;
+			}
+
+			s += ": ";
+			s += msg;
+			scriptedUI->RecordChatLog(s, ConvertColorRGBA(p.GetColor()));
 
 			// filters chat messages (but they can still be found in logs)
 			if (cg_ignoreChatMessages && !p.IsLocalPlayer())
 				return;
 
-			{
-				std::string s;
-
-				// add prefix
-				if (global) {
-					s += _Tr("Client", "[Global]");
-					s += " ";
-				}
-
-				// add player name (team-colored)
-				s += ChatWindow::TeamColorMessage(playerNameStr, p.GetTeamId());
-
-				// add player state
-				if (!state.empty()) {
-					s += " ";
-					s += state;
-				}
-
-				s += ": ";
-				s += msg;
-				chatWindow->AddMessage(s);
-			}
+			chatWindow->AddMessage(s);
 
 			if (!IsMuted()) {
 				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Chat.opus");

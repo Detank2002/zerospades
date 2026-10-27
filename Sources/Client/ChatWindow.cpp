@@ -131,6 +131,21 @@ namespace spades {
 			return s;
 		}
 
+		std::string ChatWindow::StripFormatting(const std::string& msg) {
+			std::string s;
+			s.reserve(msg.size());
+			for (size_t i = 0; i < msg.size(); i++) {
+				if (msg[i] >= 1 && msg[i] <= MsgColorMax) {
+					// An image takes the byte after it as its kind.
+					if (msg[i] == MsgImage)
+						i++;
+					continue;
+				}
+				s += msg[i];
+			}
+			return s;
+		}
+
 		std::string ChatWindow::TeamColorMessage(const std::string& msg, int team) {
 			SPADES_MARK_FUNCTION_DEBUG();
 			switch (team) {
