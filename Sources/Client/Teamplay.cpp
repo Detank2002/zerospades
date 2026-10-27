@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -77,7 +78,14 @@ namespace spades {
 		}
 
 		std::string Teamplay::SanitizeReason(std::string reason) {
-			reason = TrimSpaces(StripNewlines(DropIllFormedUTF8(reason)));
+			reason = StripNewlines(DropIllFormedUTF8(reason));
+			reason.erase(std::remove_if(reason.begin(), reason.end(),
+										[](char c) {
+											auto u = static_cast<unsigned char>(c);
+											return u < 0x20 || u == 0x7F;
+										}),
+						 reason.end());
+			reason = TrimSpaces(reason);
 
 			if (reason.size() > kMaxReasonBytes) {
 				// Back off to the start of the codepoint that straddles the cap, so the
