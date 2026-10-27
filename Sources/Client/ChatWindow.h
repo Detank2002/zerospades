@@ -69,6 +69,8 @@ namespace spades {
 			float GetHeight();
 			float GetLineHeight();
 
+			/** Kill images are named by a letter from `a`, after `MsgImage`. */
+			static constexpr int kKillImageCount = 13;
 			std::vector<IImage*> killImages;
 			IImage* GetKillImage(char);
 

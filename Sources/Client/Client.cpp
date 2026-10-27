@@ -1510,22 +1510,29 @@ namespace spades {
 			activeNet->SendTeamplayPing(pos, std::string());
 		}
 
-		void Client::ServerSentMessage(bool system, const std::string& msg) {
+		void Client::ServerSentMessage(bool system, const std::string& prefixed) {
+			// The prefix only says where the message is shown; it is never part of
+			// the words, in the log or in the chat window.
+			const std::string prefix = prefixed.substr(0, 3);
+			const bool big = prefix == CHATPREFIX_BIG;
+			stmp::optional<AlertType> alert;
+			if (prefix == CHATPREFIX_NOTICE)
+				alert = AlertType::Notice;
+			else if (prefix == CHATPREFIX_WARNING)
+				alert = AlertType::Warning;
+			else if (prefix == CHATPREFIX_ERROR)
+				alert = AlertType::Error;
+			const std::string msg = big || alert ? prefixed.substr(3) : prefixed;
+
 			NetLog("%s", msg.c_str());
 			scriptedUI->RecordChatLog(msg);
 
 			if (cg_serverAlert) {
-				if (msg.substr(0, 3) == CHATPREFIX_BIG) {
-					centerMessageView->AddMessage(msg.substr(3));
+				if (big) {
+					centerMessageView->AddMessage(msg);
 					return;
-				} else if (msg.substr(0, 3) == CHATPREFIX_NOTICE) {
-					ShowAlert(msg.substr(3), AlertType::Notice);
-					return;
-				} else if (msg.substr(0, 3) == CHATPREFIX_WARNING) {
-					ShowAlert(msg.substr(3), AlertType::Warning);
-					return;
-				} else if (msg.substr(0, 3) == CHATPREFIX_ERROR) {
-					ShowAlert(msg.substr(3), AlertType::Error);
+				} else if (alert) {
+					ShowAlert(msg, *alert);
 					return;
 				}
 			}
