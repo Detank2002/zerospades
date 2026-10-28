@@ -264,8 +264,9 @@ namespace spades {
 		GameResources::Cache& GameResources::GetCache(Skin* skin, const std::string& path) {
 			if (!skin || !skin->Has(path))
 				return shared;
-			auto& entry = skinned[skin->GetName()];
-			entry.first = Handle<Skin>(*skin);
+			auto& entry = skinned[skin];
+			if (!entry.first)
+				entry.first = Handle<Skin>(*skin);
 			return entry.second;
 		}
 
@@ -308,7 +309,7 @@ namespace spades {
 			  .Cast<IAudioDevice>();
 		}
 
-		void GameResources::ForgetSkin(const std::string& name) { skinned.erase(name); }
+		void GameResources::ForgetSkin(const Skin& skin) { skinned.erase(&skin); }
 
 		std::vector<std::string> GameResources::GetImageAndModelFiles() const {
 			std::vector<std::string> files;

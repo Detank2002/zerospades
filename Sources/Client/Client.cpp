@@ -1328,7 +1328,7 @@ namespace spades {
 				retiredSkinViews.push_back(std::move(view->second));
 				skinViews.erase(view);
 			}
-			gameResources->ForgetSkin(name);
+			gameResources->ForgetSkin(*skins[name]);
 			skins.erase(name);
 			skinsRevision++;
 			return {};

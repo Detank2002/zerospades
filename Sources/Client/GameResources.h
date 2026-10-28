@@ -82,8 +82,8 @@ namespace spades {
 			 * set, seeing `skin` on top if there is one.
 			 */
 			Handle<IAudioDevice> CreateAudioDevice(Handle<Skin> skin = {});
-			/** Drops what was loaded from the skin `name`; its holders keep it. */
-			void ForgetSkin(const std::string& name);
+			/** Drops what was loaded from `skin`; its holders keep it. */
+			void ForgetSkin(const Skin& skin);
 
 			std::vector<std::string> GetImageAndModelFiles() const;
 			std::vector<std::string> GetSoundFiles() const;
@@ -125,8 +125,9 @@ namespace spades {
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audio;
 			Cache shared;
-			// The files skins have their own of, by skin name.
-			std::map<std::string, std::pair<Handle<Skin>, Cache>> skinned;
+			// The files skins have their own of, by skin: a skin loaded again under
+			// the same name is another skin.
+			std::map<const Skin*, std::pair<Handle<Skin>, Cache>> skinned;
 			std::uint64_t generation = 0;
 
 			/** Where `path`, loaded for `skin`, is held. */
