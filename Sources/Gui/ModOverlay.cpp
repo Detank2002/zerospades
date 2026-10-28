@@ -221,11 +221,14 @@ namespace spades {
 				  stmp::make_unique<client::GameAssetReload>(*game, changes.game, errors);
 				if (!errors.empty()) {
 					// Blame the mods the failing files come from, while they are mounted.
+					// Only a mod of this set can be left out: one the game loaded for
+					// itself (GetOwner sees both layers) is not, and leaving out nothing
+					// would loop forever.
 					std::map<std::string, std::string> culprits;
 					bool blameless = false;
 					for (const ResourceLoadError& error : errors) {
 						std::string mod = error.path.empty() ? "" : PakOverlay::GetOwner(error.path);
-						if (mod.empty())
+						if (std::find(target.begin(), target.end(), mod) == target.end())
 							blameless = true;
 						else
 							culprits.emplace(mod, DescribeError(error));

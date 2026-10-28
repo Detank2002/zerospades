@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -77,6 +78,7 @@ namespace spades {
 			std::unordered_set<std::string> files; // normalized
 			bool hasScripts = false;
 			std::string scriptModule = "Client";
+			std::uint64_t moduleSerial = 0; // names the module, once it has one
 
 			Skin() = default;
 			std::vector<IFileSystem*> GetFileSystems() const;

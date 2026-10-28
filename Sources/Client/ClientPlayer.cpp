@@ -22,6 +22,8 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <initializer_list>
+#include <memory>
 
 #include "CTFGameMode.h"
 #include "Client.h"
@@ -34,10 +36,13 @@
 #include "IModel.h"
 #include "IRenderer.h"
 #include "Player.h"
+#include "Skin.h"
 #include "Weapon.h"
 #include "World.h"
 #include "NetClient.h"
 #include <Core/Bitmap.h>
+#include <Core/FileManager.h>
+#include <Core/TMPUtils.h>
 #include <Core/Settings.h>
 #include <ScriptBindings/IBlockSkin.h>
 #include <ScriptBindings/IGrenadeSkin.h>
@@ -333,24 +338,60 @@ namespace spades {
 			flashlightOrientation = p.GetFront();
 			classicViewWeaponOrigin = MakeVector3(0, 0, 0);
 
-			CreateSkins();
+			spadeSkin = blockSkin = weaponSkin = grenadeSkin = nullptr;
+			spadeViewSkin = blockViewSkin = weaponViewSkin = grenadeViewSkin = nullptr;
+			try {
+				CreateSkins(true);
+			} catch (const std::exception& ex) {
+				// A skin that doesn't work costs the player their skin, not the game.
+				if (!client.GetPlayerSkin(p.GetId()))
+					throw;
+				SPLog("Skin of player #%d not used: %s", p.GetId(), ex.what());
+				CreateSkins(false);
+			}
 		}
 
-		void ClientPlayer::CreateSkins() {
+		void ClientPlayer::CreateSkins(bool withSkin) {
 			SPADES_MARK_FUNCTION();
 
 			// The player's skin, if they wear one, is what the skins load and are made from.
 			int id = player.GetId();
-			Skin* skin = client.GetPlayerSkin(id);
-			IAudioDevice& audio = client.GetPlayerAudioDevice(id);
-			sandboxedRenderer =
-			  Handle<SandboxedRenderer>::New(Handle<IRenderer>(client.GetPlayerRenderer(id)));
+			Skin* skin = withSkin ? client.GetPlayerSkin(id) : nullptr;
+			IAudioDevice& audio = skin ? client.GetPlayerAudioDevice(id) : client.GetAudioDevice();
+			sandboxedRenderer = Handle<SandboxedRenderer>::New(
+			  Handle<IRenderer>(skin ? client.GetPlayerRenderer(id) : client.GetRenderer()));
 			IRenderer& renderer = *sandboxedRenderer;
 			std::string module = skin ? skin->GetScriptModule() : "Client";
 			skinScriptGeneration = ScriptManager::GetInstance()->GetGeneration();
-			appliedSkin = skin;
+			// Even without it, so a skin that failed isn't tried again every frame.
+			appliedSkin = client.GetPlayerSkin(id);
 			appliedSkinsRevision = client.GetSkinsRevision();
 
+			// What the skin scripts read themselves (Bitmap@, VoxelModel@) comes from
+			// the game's files, and from the skin's on top: the renderer and audio
+			// device only cover what is loaded through them.
+			FileManager::GameScope game;
+			std::unique_ptr<Skin::Scope> skinFiles;
+			if (skin)
+				skinFiles = stmp::make_unique<Skin::Scope>(*skin);
+
+			try {
+				CreateSkinObjects(module, renderer, audio);
+			} catch (...) {
+				// Release what was made before the failure.
+				for (asIScriptObject** object :
+				     {&spadeSkin, &blockSkin, &weaponSkin, &grenadeSkin, &spadeViewSkin,
+				      &blockViewSkin, &weaponViewSkin, &grenadeViewSkin}) {
+					if (*object)
+						(*object)->Release();
+					*object = nullptr;
+				}
+				throw;
+			}
+		}
+
+		void ClientPlayer::CreateSkinObjects(const std::string& module, IRenderer& renderer,
+		                                     IAudioDevice& audio) {
 			spadeSkin = initScriptFactory(g_spadeFactory, module, renderer, audio);
 			spadeViewSkin = initScriptFactory(g_spadeViewFactory, module, renderer, audio);
 			blockSkin = initScriptFactory(g_blockFactory, module, renderer, audio);
@@ -395,7 +436,7 @@ namespace spades {
 			Handle<SandboxedRenderer> oldRenderer = sandboxedRenderer;
 
 			try {
-				CreateSkins();
+				CreateSkins(true);
 			} catch (const std::exception& ex) {
 				// Keep the skins of the previous scripts, and don't try again each frame.
 				SPLog("Skins of player #%d not rebuilt: %s", player.GetId(), ex.what());

@@ -28,6 +28,27 @@
 
 namespace spades {
 	namespace client {
+		namespace {
+			// Files paks often carry by accident (Finder and Explorer leftovers) or
+			// for people (a readme). Nothing loads them, so they don't stop a skin.
+			bool IsStray(const std::string& file) {
+				std::string base = ResourceChanges::Normalize(file);
+				std::size_t slash = base.rfind('/');
+				if (slash != std::string::npos)
+					base = base.substr(slash + 1);
+				auto endsWith = [&](const char* suffix) {
+					std::size_t n = std::char_traits<char>::length(suffix);
+					return base.size() >= n && base.compare(base.size() - n, n, suffix) == 0;
+				};
+				return base.empty() || base[0] == '.' || base == "thumbs.db" ||
+				       base == "desktop.ini" || endsWith(".txt") || endsWith(".md");
+			}
+
+			// Each skin's script module has a name of its own: a skin loaded again
+			// under the same name must not take, or drop, the old one's module.
+			std::uint64_t g_nextModuleSerial = 1;
+		} // namespace
+
 		Handle<Skin> Skin::Load(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
@@ -43,7 +64,7 @@ namespace spades {
 			std::vector<std::string> assets;
 			for (const auto& pak : skin->paks) {
 				for (const std::string& file : pak->GetFiles()) {
-					if (file.empty() || file.back() == '/')
+					if (file.empty() || file.back() == '/' || IsStray(file))
 						continue;
 					ResourceChanges::AssetKind kind = ResourceChanges::GetAssetKind(file);
 					if (kind == ResourceChanges::AssetKind::None)
@@ -92,7 +113,9 @@ namespace spades {
 
 			if (!hasScripts)
 				return {};
-			std::string module = "Skin:" + name;
+			if (moduleSerial == 0)
+				moduleSerial = g_nextModuleSerial++;
+			std::string module = "Skin:" + name + "#" + std::to_string(moduleSerial);
 			std::string file;
 			std::string error;
 			{

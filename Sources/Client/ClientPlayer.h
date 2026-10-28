@@ -80,8 +80,13 @@ namespace spades {
 			std::uint64_t appliedSkinsRevision = 0;
 
 			asIScriptObject* GetCurrentSkin(bool viewSkin);
-			/** Builds the skins from the current scripts. */
-			void CreateSkins();
+			/**
+			 * Builds the skins from the current scripts, from the player's own skin
+			 * if they wear one and `withSkin`. Raises with no skin made.
+			 */
+			void CreateSkins(bool withSkin);
+			void CreateSkinObjects(const std::string& module, IRenderer& renderer,
+			                       IAudioDevice& audio);
 
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
