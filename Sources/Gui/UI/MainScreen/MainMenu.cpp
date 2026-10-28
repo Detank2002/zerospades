@@ -916,7 +916,8 @@ namespace spades {
 			if (modsHelper->PollRefreshState()) {
 				modsDownloading = false;
 				// The download may have replaced enabled paks: let Apply pick them up.
-				if (!modsHelper->GetEnabledMods().empty())
+				if (modsHelper->GetRefreshMessage().empty() &&
+				    !modsHelper->GetEnabledMods().empty())
 					modsDirty = true;
 				LoadModList();
 				// A non-empty refresh message means the download failed. The

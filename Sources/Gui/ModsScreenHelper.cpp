@@ -44,6 +44,7 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/PakOverlay.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Core/Thread.h>
@@ -760,23 +761,20 @@ namespace spades {
 			WriteEnabled(modNames);
 		}
 
-		std::vector<std::pair<std::string, std::string>>
+		std::vector<ModsScreenHelper::ModPak>
 		ModsScreenHelper::GetModPaks(const std::vector<std::string>& modNames) {
-			// Resolve the names to pak paths relative to the resource root, in
-			// the given order. A throwaway helper does the directory scan, so this
-			// also runs at startup, before any instance exists. Names with no
-			// matching mod on disk are skipped.
-			Handle<ModsScreenHelper> h = Handle<ModsScreenHelper>::New();
-			h->RebuildModsCache();
-			std::vector<std::pair<std::string, std::string>> out;
+			// In the given order. Names with no matching mod on disk are skipped.
+			std::vector<ModPak> out;
 			for (const std::string& name : modNames) {
-				const ModEntry* m = h->FindMod(name);
-				if (m == nullptr)
-					continue;
-				for (const std::string& pak : m->paks)
-					out.emplace_back(name, m->isFolder
-						? (std::string(kModsDir) + "/" + m->name + "/" + pak)
-						: (std::string(kModsDir) + "/" + pak));
+				for (std::string& path : PakOverlay::FindModPaks(name)) {
+					// Size and modification time: a pak that keeps both is not read again.
+					std::string stamp;
+					struct stat st;
+					if (stat((UserRoot() + "/" + path).c_str(), &st) == 0)
+						stamp = std::to_string(static_cast<long long>(st.st_size)) + "@" +
+						        std::to_string(static_cast<long long>(st.st_mtime));
+					out.push_back({name, std::move(path), std::move(stamp)});
+				}
 			}
 			return out;
 		}

@@ -357,6 +357,10 @@ namespace spades {
 			// by whoever connects next.
 			teamplay->PlayerLeft(playerId);
 
+			// Nor should their skin go to whoever takes the slot.
+			if (playerSkins.erase(playerId))
+				skinsRevision++;
+
 			// A menu aimed at this player would otherwise name whoever takes the slot
 			// next, so it closes without sending anything.
 			if (pieMenuView && pieMenuView->IsOpen() &&

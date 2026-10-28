@@ -78,12 +78,15 @@ namespace spades {
 			// Replace the enabled set, e.g. to go back to the one last mounted.
 			void SetEnabledMods(const std::vector<std::string>& modNames);
 
-			// The paks of `modNames` to mount as an overlay, as (mod name, pak
-			// path relative to the resource root, e.g. "Mods/<folder>/<x>.pak").
-			// In the given order, so the last one ends up on top and wins
-			// conflicts. Mods missing from disk are skipped.
-			static std::vector<std::pair<std::string, std::string>>
-			GetModPaks(const std::vector<std::string>& modNames);
+			struct ModPak {
+				std::string mod;
+				std::string path;  // relative to the resource root, e.g. "Mods/<folder>/<x>.pak"
+				std::string stamp; // the file's size and time, or "" if unknown
+			};
+			// The paks of `modNames` to mount as an overlay (see
+			// PakOverlay::FindModPaks), in the given order, so the last one ends
+			// up on top and wins conflicts. Mods missing from disk are skipped.
+			static std::vector<ModPak> GetModPaks(const std::vector<std::string>& modNames);
 
 			// Whether a refresh is still writing into Mods/.
 			static bool IsDownloading();

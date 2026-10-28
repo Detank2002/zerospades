@@ -23,6 +23,7 @@
 
 #include <list>
 #include <array>
+#include <map>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -545,6 +546,23 @@ namespace spades {
 			std::string SetGameMods(PakOverlay::PakSet paks);
 			void UnloadGameMods();
 
+			// Skins: loaded ones by name, and who wears which.
+			std::map<std::string, Handle<Skin>> skins;
+			std::map<int, std::string> playerSkins; // by player id
+			std::map<int, std::string> teamSkins;   // by team id
+			struct SkinView {
+				Handle<IRenderer> renderer;
+				Handle<IAudioDevice> audio;
+			};
+			// Kept as long as the game, so corpses can hold on to them.
+			std::map<std::string, SkinView> skinViews;
+			std::vector<SkinView> retiredSkinViews; // of unloaded skins
+			std::uint64_t skinsRevision = 0;
+			std::uint64_t skinScriptsGeneration = 0;
+			SkinView& GetSkinView(Skin&);
+			/** Rebuilds the skins' script modules once the game's scripts changed. */
+			void UpdateSkinScripts();
+
 			// Killsteak sounds
 			std::vector<Handle<IAudioChunk>> killSounds;
 			// GameResources::GetGeneration() when the folder was listed.
@@ -788,18 +806,42 @@ namespace spades {
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
 			GameResources& GetGameResources() { return *gameResources; }
 
+			// Mods and skins loaded while the game runs. Nothing calls these yet.
+
 			/**
-			 * Loads the mod in the pak at `path`, a resource path, over the game's
-			 * assets, without a restart: a skin or weapon mod, for example. Such a
-			 * mod holds game assets only: models, images, sounds and skin scripts.
-			 * Returns why it wasn't loaded, or "" once it is; on a failure nothing
-			 * changes. The game unloads its mods when it ends.
-			 *
-			 * Nothing calls these yet.
+			 * Loads the mod `name` from Mods/ over the game's assets, for every
+			 * player, without a restart: a weapon or skin mod, for example. Such a
+			 * mod holds game assets only (models, images, sounds, skin scripts), and
+			 * only the game sees it. Returns why it wasn't loaded, or "" once it
+			 * is; on a failure nothing changes. The game unloads it when it ends.
 			 */
-			std::string LoadGameMod(const std::string& path);
-			/** Unloads the mod loaded from `path`. Returns why it couldn't, or "". */
-			std::string UnloadGameMod(const std::string& path);
+			std::string LoadGameMod(const std::string& name);
+			/** Unloads the mod `name`. Returns why it couldn't, or "". */
+			std::string UnloadGameMod(const std::string& name);
+
+			/**
+			 * Loads the mod `name` from Mods/ as a skin, for `SetPlayerSkin` and
+			 * `SetTeamSkin`, which load it too. Returns why it wasn't loaded, or "".
+			 */
+			std::string LoadSkin(const std::string& name);
+			/** Takes the skin `name` off everyone and unloads it. */
+			std::string UnloadSkin(const std::string& name);
+			/**
+			 * Gives the player `playerId` the skin `name`, over their team's, or
+			 * takes theirs off with "". Their player models, weapons and sounds
+			 * change on the next frame. Returns why it couldn't, or "".
+			 */
+			std::string SetPlayerSkin(int playerId, const std::string& name);
+			/** Gives the team `teamId` the skin `name`, or takes it off with "". */
+			std::string SetTeamSkin(int teamId, const std::string& name);
+
+			/** The skin the player `playerId` wears, or null. */
+			Skin* GetPlayerSkin(int playerId);
+			/** The renderer and audio device that load the player's assets, skin included. */
+			IRenderer& GetPlayerRenderer(int playerId);
+			IAudioDevice& GetPlayerAudioDevice(int playerId);
+			/** Changes whenever a skin is given, taken off or rebuilt. */
+			std::uint64_t GetSkinsRevision() const { return skinsRevision; }
 			gui::SoftwareCursor* GetCursor() { return cursor.get(); }
 
 			float GetTime() { return time; }

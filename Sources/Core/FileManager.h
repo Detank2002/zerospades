@@ -40,6 +40,11 @@ namespace spades {
 		static void AppendFileSystem(IFileSystem*);
 		static void PrependFileSystem(IFileSystem*);
 		/**
+		 * Mounts `fs` for the game alone: only reads in a GameScope see it, on top
+		 * of every other file system. The software's own reads never do.
+		 */
+		static void PrependGameFileSystem(IFileSystem*);
+		/**
 		 * Unmounts `fs` and hands it back to the caller, or returns null if it isn't
 		 * mounted. Streams already opened from it stay valid.
 		 */
@@ -47,5 +52,26 @@ namespace spades {
 		static std::vector<std::string> EnumFiles(const char*);
 		static std::string ReadAllBytes(const char*);
 		static void Close();
+
+		/** While one is alive, reads on this thread also see the game's file systems. */
+		class GameScope {
+		public:
+			GameScope();
+			~GameScope();
+			GameScope(const GameScope&) = delete;
+			void operator=(const GameScope&) = delete;
+		};
+
+		/**
+		 * While one is alive, reads on this thread see `fileSystems` on top of
+		 * everything, the first one topmost. The caller keeps them alive.
+		 */
+		class Overlay {
+		public:
+			explicit Overlay(std::vector<IFileSystem*> fileSystems);
+			~Overlay();
+			Overlay(const Overlay&) = delete;
+			void operator=(const Overlay&) = delete;
+		};
 	};
 }; // namespace spades

@@ -29,6 +29,8 @@
 #include "Client.h"
 #include "Fonts.h"
 #include "GameAssetReload.h"
+#include "Skin.h"
+#include <ScriptBindings/ScriptManager.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Settings.h>
@@ -1210,31 +1212,41 @@ namespace spades {
 			CloseLimboView();
 		}
 
-		std::string Client::LoadGameMod(const std::string& path) {
+		std::string Client::LoadGameMod(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
-			std::shared_ptr<PakOverlay::Pak> pak;
+			// One route per mod: enabled for everything, or loaded for this game.
+			for (const PakOverlay::Layer layer : {PakOverlay::Layer::Mods, PakOverlay::Layer::Game}) {
+				for (const auto& pak : PakOverlay::GetLayer(layer)) {
+					if (pak->GetOwner() == name)
+						return Format("The mod '{0}' is already loaded.", name);
+				}
+			}
+
+			std::vector<std::string> paths = PakOverlay::FindModPaks(name);
+			if (paths.empty())
+				return Format("There is no mod named '{0}' in Mods/.", name);
+			PakOverlay::PakSet paks = PakOverlay::GetLayer(PakOverlay::Layer::Game);
 			try {
-				pak = PakOverlay::Load(path, path);
+				for (const std::string& path : paths)
+					paks.push_back(PakOverlay::Load(path, name));
 			} catch (const std::exception& ex) {
 				return ex.what();
 			}
-			PakOverlay::PakSet paks = PakOverlay::GetLayer(PakOverlay::Layer::Game);
-			paks.push_back(std::move(pak));
 			return SetGameMods(std::move(paks));
 		}
 
-		std::string Client::UnloadGameMod(const std::string& path) {
+		std::string Client::UnloadGameMod(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
 			PakOverlay::PakSet paks = PakOverlay::GetLayer(PakOverlay::Layer::Game);
-			auto it = std::find_if(paks.begin(), paks.end(),
-			                       [&](const std::shared_ptr<PakOverlay::Pak>& pak) {
-				                       return pak->GetOwner() == path;
-			                       });
-			if (it == paks.end())
-				return Format("No mod is loaded from '{0}'.", path);
-			paks.erase(it);
+			auto end = std::remove_if(paks.begin(), paks.end(),
+			                          [&](const std::shared_ptr<PakOverlay::Pak>& pak) {
+				                          return pak->GetOwner() == name;
+			                          });
+			if (end == paks.end())
+				return Format("The mod '{0}' is not loaded in this game.", name);
+			paks.erase(end, paks.end());
 			return SetGameMods(std::move(paks));
 		}
 
@@ -1242,19 +1254,20 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			PakOverlay::PakSet previous = PakOverlay::GetLayer(PakOverlay::Layer::Game);
-			ResourceChanges changes = PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(paks));
+			PakOverlay::Changes changes =
+			  PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(paks));
 
-			// These mods last a game, so they can't touch what only a restart reloads.
-			std::vector<std::string> software =
-			  GameAssetReload::GetSoftwareChanges(changes, *shellRenderer, *shellAudioDevice);
-			if (!software.empty()) {
-				PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(previous));
-				return Format("A mod loaded in game can only change game assets, not '{0}'.",
-				              software.front());
+			// The software never sees these mods, so only a game asset can matter.
+			for (const std::string& path : changes.game.GetPaths()) {
+				if (!ResourceChanges::IsGameAsset(path)) {
+					PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(previous));
+					return Format("A mod loaded in game can only change game assets, not '{0}'.",
+					              path);
+				}
 			}
 
 			std::vector<ResourceLoadError> errors;
-			GameAssetReload reload(*gameResources, changes, errors);
+			GameAssetReload reload(*gameResources, changes.game, errors);
 			if (!errors.empty()) {
 				PakOverlay::SetLayer(PakOverlay::Layer::Game, std::move(previous));
 				const ResourceLoadError& error = errors.front();
@@ -1270,22 +1283,150 @@ namespace spades {
 			if (PakOverlay::GetLayer(PakOverlay::Layer::Game).empty())
 				return;
 
-			// The game ends either way: put back what can be, and log the rest.
-			ResourceChanges changes = PakOverlay::SetLayer(PakOverlay::Layer::Game, {});
-			std::vector<ResourceLoadError> errors;
-			GameAssetReload reload(*gameResources, changes, errors);
-			for (const ResourceLoadError& error : errors)
-				SPLog("Game mod not fully unloaded: %s: %s", error.path.c_str(),
-				      error.message.c_str());
-			reload.Commit();
+			// The game's assets go with it; only the script module outlives it.
+			PakOverlay::Changes changes = PakOverlay::SetLayer(PakOverlay::Layer::Game, {});
+			if (!changes.game.ContainsUnder("Scripts"))
+				return;
+			ScriptManager& scripts = *ScriptManager::GetInstance();
+			std::string file;
+			std::string error = scripts.PrepareReload(file);
+			if (error.empty())
+				scripts.CommitReload();
+			else
+				SPLog("Scripts not restored after the game's mods: %s", error.c_str());
+		}
+
+		std::string Client::LoadSkin(const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (skins.count(name))
+				return {};
+			try {
+				skins[name] = Skin::Load(name);
+			} catch (const std::exception& ex) {
+				return Format("The skin '{0}' was not loaded: {1}", name, ex.what());
+			}
+			return {};
+		}
+
+		std::string Client::UnloadSkin(const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (!skins.count(name))
+				return Format("The skin '{0}' is not loaded.", name);
+			for (auto* assigned : {&playerSkins, &teamSkins}) {
+				for (auto it = assigned->begin(); it != assigned->end();) {
+					if (it->second == name)
+						it = assigned->erase(it);
+					else
+						++it;
+				}
+			}
+			// Corpses may still draw with its renderer: keep that until the game ends.
+			auto view = skinViews.find(name);
+			if (view != skinViews.end()) {
+				retiredSkinViews.push_back(std::move(view->second));
+				skinViews.erase(view);
+			}
+			gameResources->ForgetSkin(name);
+			skins.erase(name);
+			skinsRevision++;
+			return {};
+		}
+
+		std::string Client::SetPlayerSkin(int playerId, const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (!name.empty()) {
+				std::string error = LoadSkin(name);
+				if (!error.empty())
+					return error;
+				playerSkins[playerId] = name;
+			} else {
+				playerSkins.erase(playerId);
+			}
+			skinsRevision++;
+			return {};
+		}
+
+		std::string Client::SetTeamSkin(int teamId, const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (!name.empty()) {
+				std::string error = LoadSkin(name);
+				if (!error.empty())
+					return error;
+				teamSkins[teamId] = name;
+			} else {
+				teamSkins.erase(teamId);
+			}
+			skinsRevision++;
+			return {};
+		}
+
+		Skin* Client::GetPlayerSkin(int playerId) {
+			// The player's own skin, then their team's.
+			auto it = playerSkins.find(playerId);
+			if (it == playerSkins.end() && world) {
+				if (stmp::optional<Player&> p = world->GetPlayer(playerId))
+					it = teamSkins.find(p->GetTeamId());
+				else
+					return nullptr;
+				if (it == teamSkins.end())
+					return nullptr;
+			} else if (it == playerSkins.end()) {
+				return nullptr;
+			}
+			auto skin = skins.find(it->second);
+			return skin == skins.end() ? nullptr : skin->second.GetPointerOrNull();
+		}
+
+		Client::SkinView& Client::GetSkinView(Skin& skin) {
+			SkinView& view = skinViews[skin.GetName()];
+			if (!view.renderer) {
+				view.renderer = gameResources->CreateRenderer(Handle<Skin>(skin));
+				view.audio = gameResources->CreateAudioDevice(Handle<Skin>(skin));
+			}
+			return view;
+		}
+
+		IRenderer& Client::GetPlayerRenderer(int playerId) {
+			Skin* skin = GetPlayerSkin(playerId);
+			return skin ? *GetSkinView(*skin).renderer : *renderer;
+		}
+
+		IAudioDevice& Client::GetPlayerAudioDevice(int playerId) {
+			Skin* skin = GetPlayerSkin(playerId);
+			return skin ? *GetSkinView(*skin).audio : *audioDevice;
+		}
+
+		void Client::UpdateSkinScripts() {
+			// The skins' script modules are built from the game's scripts.
+			std::uint64_t generation = ScriptManager::GetInstance()->GetGeneration();
+			if (skinScriptsGeneration == generation)
+				return;
+			skinScriptsGeneration = generation;
+			if (skins.empty())
+				return;
+			for (auto& skin : skins) {
+				std::string error = skin.second->BuildScripts();
+				if (!error.empty())
+					SPLog("Scripts of the skin '%s' not rebuilt: %s", skin.first.c_str(),
+					      error.c_str());
+			}
+			skinsRevision++;
 		}
 
 		void Client::LoadKillSounds() {
 			killSounds.clear();
 			killSoundsGeneration = gameResources->GetGeneration();
 
-			// list available sounds in the directory
-			auto files = FileManager::EnumFiles("Sounds/Feedback/Killstreak");
+			// list available sounds in the directory, as the game sees it
+			std::vector<std::string> files;
+			{
+				FileManager::GameScope scope;
+				files = FileManager::EnumFiles("Sounds/Feedback/Killstreak");
+			}
 			for (const auto& file : files) {
 				// check extension
 				if (file.size() < 5 || file.rfind(".opus") != file.size() - 5)

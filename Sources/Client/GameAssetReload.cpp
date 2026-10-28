@@ -24,6 +24,7 @@
 #include "IAudioDevice.h"
 #include "IRenderer.h"
 #include <Core/Debug.h>
+#include <Core/FileManager.h>
 #include <Core/VoxelModelLoader.h>
 #include <ScriptBindings/ScriptManager.h>
 
@@ -35,6 +36,8 @@ namespace spades {
 		    : resources(resources) {
 			SPADES_MARK_FUNCTION();
 
+			// The game's scripts include the mods it loaded for itself.
+			FileManager::GameScope scope;
 			if (changes.ContainsUnder("Scripts")) {
 				std::string file;
 				std::string error = ScriptManager::GetInstance()->PrepareReload(file);

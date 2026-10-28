@@ -30,7 +30,9 @@ namespace spades {
 
 		static NullChunk nullChunkInstance;
 
-		client::IAudioChunk* NullDevice::RegisterSound(const char*) { return &nullChunkInstance; }
+		Handle<client::IAudioChunk> NullDevice::RegisterSound(const char*) {
+			return {&nullChunkInstance};
+		}
 		Handle<client::IAudioChunk> NullDevice::CreateSound(const char*) {
 			return {&nullChunkInstance};
 		}

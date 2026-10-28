@@ -815,18 +815,17 @@ namespace spades {
 			}
 		}
 
-		client::IAudioChunk* ALDevice::RegisterSound(const char* name) {
+		Handle<client::IAudioChunk> ALDevice::RegisterSound(const char* name) {
 			SPADES_MARK_FUNCTION();
 
 			std::map<std::string, ALAudioChunk*>::iterator it = chunks.find(name);
 			if (it == chunks.end()) {
+				// The cache keeps the reference the chunk is made with.
 				ALAudioChunk* c = CreateChunk(name);
 				chunks[name] = c;
-				// release audiochunk later (to eliminate memory leak)
-				return c;
+				return {c};
 			}
-			it->second->AddRef();
-			return it->second;
+			return {it->second};
 		}
 
 		void ALDevice::ClearCache() {

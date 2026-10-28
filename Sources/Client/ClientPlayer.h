@@ -36,6 +36,7 @@ namespace spades {
 		class IRenderer;
 		class IAudioDevice;
 		class SandboxedRenderer;
+		class Skin;
 
 		// TODO: Use `shared_ptr` instead of `RefCountedObject`
 		/** Representation of player which is used by
@@ -74,6 +75,9 @@ namespace spades {
 
 			// ScriptManager::GetGeneration() of the module the skins come from.
 			std::uint64_t skinScriptGeneration;
+			// The player's skin and Client::GetSkinsRevision() when they were made.
+			Skin* appliedSkin = nullptr;
+			std::uint64_t appliedSkinsRevision = 0;
 
 			asIScriptObject* GetCurrentSkin(bool viewSkin);
 			/** Builds the skins from the current scripts. */
@@ -99,7 +103,7 @@ namespace spades {
 			AmbienceInfo ComputeAmbience();
 
 			// TODO: Naming convention violation
-			asIScriptObject* initScriptFactory(ScriptFunction& creator,
+			asIScriptObject* initScriptFactory(ScriptFunction& creator, const std::string& module,
 				IRenderer& renderer, IAudioDevice& audio);
 
 		protected:
@@ -109,10 +113,11 @@ namespace spades {
 			ClientPlayer(Player& p, Client&);
 			Player& GetPlayer() const { return player; }
 
-			/** False once the skin scripts were reloaded, until `RebuildSkins`. */
-			bool HasCurrentSkins() const {
-				return skinScriptGeneration == ScriptManager::GetInstance()->GetGeneration();
-			}
+			/**
+			 * False once the skin scripts were reloaded or the player's skin changed,
+			 * until `RebuildSkins`.
+			 */
+			bool HasCurrentSkins();
 			/**
 			 * Builds the skins again from the reloaded scripts. The rest of the
 			 * player's state, such as its animations, stays as it is.

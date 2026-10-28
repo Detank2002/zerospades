@@ -22,12 +22,16 @@
 #include <unordered_map>
 
 #include "GameResources.h"
+#include "Skin.h"
 #include "IAudioDevice.h"
 #include "IRenderer.h"
+#include <Core/AudioStream.h>
 #include <Core/Bitmap.h>
+#include <Core/IAudioStream.h>
 #include <Core/Debug.h>
 #include <Core/FileManager.h>
 #include <Core/VoxelModel.h>
+#include <Core/TMPUtils.h>
 #include <Core/VoxelModelLoader.h>
 
 namespace spades {
@@ -46,57 +50,67 @@ namespace spades {
 				return audio.CreateSound(path.c_str());
 			}
 
-			// Images the renderer makes itself rather than load from a file.
-			bool IsBuiltInImage(const std::string& path) {
-				return (!path.empty() && path[0] == '*') || path == "Gfx/White.tga";
-			}
+			// The game's reads while a file of `skin`, or of no skin, loads.
+			class LoadScope {
+				FileManager::GameScope game;
+				std::unique_ptr<Skin::Scope> skin;
 
-			// Each held file, by its normalized path.
-			template <class T>
-			std::unordered_map<std::string, std::pair<const std::string, Handle<T>>*>
-			IndexByNormalizedPath(std::map<std::string, Handle<T>>& held) {
-				std::unordered_map<std::string, std::pair<const std::string, Handle<T>>*> index;
-				for (auto& entry : held)
-					index[ResourceChanges::Normalize(entry.first)] = &entry;
-				return index;
-			}
-
-			// Loads `path` with `load`. If it is held, the new content goes to `out`
-			// beside its target; otherwise it is dropped: that was only a check.
-			template <class T, class Load>
-			void Prepare(const std::string& path,
-			             std::unordered_map<std::string,
-			                                std::pair<const std::string, Handle<T>>*>& held,
-			             std::vector<std::pair<Handle<T>, Handle<T>>>& out, Load load) {
-				auto it = held.find(ResourceChanges::Normalize(path));
-				if (it == held.end()) {
-					load(path);
-					return;
+			public:
+				explicit LoadScope(const Skin* s) {
+					if (s)
+						skin = stmp::make_unique<Skin::Scope>(*s);
 				}
-				Handle<T> fresh = load(it->second->first);
-				out.emplace_back(it->second->second, std::move(fresh));
+			};
+
+			template <class T, class Load>
+			Handle<T> Register(std::map<std::string, Handle<T>>& cache, const std::string& path,
+			                   const Skin* skin, Load load) {
+				auto it = cache.find(path);
+				if (it != cache.end())
+					return it->second;
+				Handle<T> object;
+				{
+					LoadScope scope(skin);
+					object = load(path);
+				}
+				cache[path] = object;
+				return object;
+			}
+
+			// The held entry of `cache` for `path`, by normalized path, or null.
+			template <class T>
+			std::pair<const std::string, Handle<T>>* Find(std::map<std::string, Handle<T>>& cache,
+			                                             const std::string& path) {
+				std::string key = ResourceChanges::Normalize(path);
+				for (auto& entry : cache) {
+					if (ResourceChanges::Normalize(entry.first) == key)
+						return &entry;
+				}
+				return nullptr;
 			}
 
 			/** Draws with a base renderer, and loads through a GameResources. */
 			class GameRenderer : public IRenderer {
 				Handle<IRenderer> base;
 				Handle<GameResources> resources;
+				Handle<Skin> skin;
 
 			protected:
 				~GameRenderer() {}
 
 			public:
-				GameRenderer(Handle<IRenderer> base, Handle<GameResources> resources)
-				    : base(std::move(base)), resources(std::move(resources)) {}
+				GameRenderer(Handle<IRenderer> base, Handle<GameResources> resources,
+				             Handle<Skin> skin)
+				    : base(std::move(base)), resources(std::move(resources)), skin(std::move(skin)) {}
 
 				void Init() override { base->Init(); }
 				void Shutdown() override { base->Shutdown(); }
 
 				Handle<IImage> RegisterImage(const char* filename) override {
-					return resources->RegisterImage(filename);
+					return resources->RegisterImage(filename, skin.GetPointerOrNull());
 				}
 				Handle<IModel> RegisterModel(const char* filename) override {
-					return resources->RegisterModel(filename);
+					return resources->RegisterModel(filename, skin.GetPointerOrNull());
 				}
 				void ClearCache() override { resources->ReloadGraphics(); }
 				std::vector<std::string> GetRegisteredFiles() override {
@@ -198,17 +212,18 @@ namespace spades {
 			class GameAudioDevice : public IAudioDevice {
 				Handle<IAudioDevice> base;
 				Handle<GameResources> resources;
+				Handle<Skin> skin;
 
 			protected:
 				~GameAudioDevice() {}
 
 			public:
-				GameAudioDevice(Handle<IAudioDevice> base, Handle<GameResources> resources)
-				    : base(std::move(base)), resources(std::move(resources)) {}
+				GameAudioDevice(Handle<IAudioDevice> base, Handle<GameResources> resources,
+				                Handle<Skin> skin)
+				    : base(std::move(base)), resources(std::move(resources)), skin(std::move(skin)) {}
 
-				// Like the base devices, this hands out a reference the caller owns.
-				IAudioChunk* RegisterSound(const char* name) override {
-					return resources->RegisterSound(name).Unmanage();
+				Handle<IAudioChunk> RegisterSound(const char* name) override {
+					return resources->RegisterSound(name, skin.GetPointerOrNull());
 				}
 				void ClearCache() override { resources->ReloadSounds(); }
 				std::vector<std::string> GetRegisteredFiles() override {
@@ -246,60 +261,67 @@ namespace spades {
 
 		GameResources::~GameResources() {}
 
-		Handle<IImage> GameResources::RegisterImage(const std::string& path) {
-			SPADES_MARK_FUNCTION();
-			if (IsBuiltInImage(path))
-				return renderer->RegisterImage(path.c_str());
-			auto it = images.find(path);
-			if (it != images.end())
-				return it->second;
-			Handle<IImage> image = LoadImage(*renderer, path);
-			images[path] = image;
-			return image;
+		GameResources::Cache& GameResources::GetCache(Skin* skin, const std::string& path) {
+			if (!skin || !skin->Has(path))
+				return shared;
+			auto& entry = skinned[skin->GetName()];
+			entry.first = Handle<Skin>(*skin);
+			return entry.second;
 		}
 
-		Handle<IModel> GameResources::RegisterModel(const std::string& path) {
+		Handle<IImage> GameResources::RegisterImage(const std::string& path, Skin* skin) {
 			SPADES_MARK_FUNCTION();
-			auto it = models.find(path);
-			if (it != models.end())
-				return it->second;
-			Handle<IModel> model = LoadModel(*renderer, path);
-			models[path] = model;
-			return model;
+			Cache& cache = GetCache(skin, path);
+			const Skin* from = &cache == &shared ? nullptr : skin;
+			return Register(cache.images, path, from, [&](const std::string& p) {
+				// Not a file: one the renderer makes itself, such as "*white".
+				if (!FileManager::FileExists(p.c_str()))
+					return renderer->RegisterImage(p.c_str());
+				return LoadImage(*renderer, p);
+			});
 		}
 
-		Handle<IAudioChunk> GameResources::RegisterSound(const std::string& path) {
+		Handle<IModel> GameResources::RegisterModel(const std::string& path, Skin* skin) {
 			SPADES_MARK_FUNCTION();
-			auto it = sounds.find(path);
-			if (it != sounds.end())
-				return it->second;
-			Handle<IAudioChunk> sound = LoadSound(*audio, path);
-			sounds[path] = sound;
-			return sound;
+			Cache& cache = GetCache(skin, path);
+			const Skin* from = &cache == &shared ? nullptr : skin;
+			return Register(cache.models, path, from,
+			                [&](const std::string& p) { return LoadModel(*renderer, p); });
 		}
 
-		Handle<IRenderer> GameResources::CreateRenderer() {
-			return Handle<GameRenderer>::New(renderer, Handle<GameResources>(*this))
+		Handle<IAudioChunk> GameResources::RegisterSound(const std::string& path, Skin* skin) {
+			SPADES_MARK_FUNCTION();
+			Cache& cache = GetCache(skin, path);
+			const Skin* from = &cache == &shared ? nullptr : skin;
+			return Register(cache.sounds, path, from,
+			                [&](const std::string& p) { return LoadSound(*audio, p); });
+		}
+
+		Handle<IRenderer> GameResources::CreateRenderer(Handle<Skin> skin) {
+			return Handle<GameRenderer>::New(renderer, Handle<GameResources>(*this), std::move(skin))
 			  .Cast<IRenderer>();
 		}
 
-		Handle<IAudioDevice> GameResources::CreateAudioDevice() {
-			return Handle<GameAudioDevice>::New(audio, Handle<GameResources>(*this))
+		Handle<IAudioDevice> GameResources::CreateAudioDevice(Handle<Skin> skin) {
+			return Handle<GameAudioDevice>::New(audio, Handle<GameResources>(*this),
+			                                    std::move(skin))
 			  .Cast<IAudioDevice>();
 		}
 
+		void GameResources::ForgetSkin(const std::string& name) { skinned.erase(name); }
+
 		std::vector<std::string> GameResources::GetImageAndModelFiles() const {
 			std::vector<std::string> files;
-			for (const auto& entry : images)
+			for (const auto& entry : shared.images)
 				files.push_back(entry.first);
-			for (const auto& entry : models)
+			for (const auto& entry : shared.models)
 				files.push_back(entry.first);
 			return files;
 		}
 
 		std::vector<std::string> GameResources::GetSoundFiles() const {
 			std::vector<std::string> files;
-			for (const auto& entry : sounds)
+			for (const auto& entry : shared.sounds)
 				files.push_back(entry.first);
 			return files;
 		}
@@ -309,14 +331,19 @@ namespace spades {
 		                             std::vector<ResourceLoadError>& errors) {
 			SPADES_MARK_FUNCTION();
 
+			// Every cache, with the skin its files load through.
+			std::vector<std::pair<Cache*, const Skin*>> caches{{&shared, nullptr}};
+			for (auto& entry : skinned)
+				caches.emplace_back(&entry.second.second, entry.second.first.GetPointerOrNull());
+
 			auto reload = stmp::make_unique<Reload>();
-			auto heldImages = IndexByNormalizedPath(images);
-			auto heldModels = IndexByNormalizedPath(models);
-			auto heldSounds = IndexByNormalizedPath(sounds);
 			std::set<std::string> modelsDone; // a model and its metadata can both change
 
 			for (const std::string& path : changes.GetPaths()) {
 				AssetKind kind = ResourceChanges::GetAssetKind(path);
+				if (kind != AssetKind::Image && kind != AssetKind::Model &&
+				    kind != AssetKind::ModelMetadata && kind != AssetKind::Sound)
+					continue; // scripts are ScriptManager's, the rest the software's
 
 				// A metadata change is a change of the model beside it.
 				std::string file = path;
@@ -324,28 +351,42 @@ namespace spades {
 					file = path.substr(0, path.size() - 10) + ".kv6";
 					kind = AssetKind::Model;
 				}
-
-				if (!FileManager::FileExists(file.c_str()))
-					continue;
 				if (kind == AssetKind::Model &&
 				    !modelsDone.insert(ResourceChanges::Normalize(file)).second)
 					continue;
 
 				try {
-					switch (kind) {
-						case AssetKind::Image:
-							Prepare(file, heldImages, reload->images,
-							        [&](const std::string& p) { return LoadImage(*renderer, p); });
-							break;
-						case AssetKind::Model:
-							Prepare(file, heldModels, reload->models,
-							        [&](const std::string& p) { return LoadModel(*renderer, p); });
-							break;
-						case AssetKind::Sound:
-							Prepare(file, heldSounds, reload->sounds,
-							        [&](const std::string& p) { return LoadSound(*audio, p); });
-							break;
-						default: break; // scripts are ScriptManager's, the rest the software's
+					bool held = false;
+					for (auto& cache : caches) {
+						LoadScope scope(cache.second);
+						if (kind == AssetKind::Image) {
+							if (auto* entry = Find(cache.first->images, file)) {
+								held = true;
+								if (FileManager::FileExists(entry->first.c_str()))
+									reload->images.emplace_back(
+									  entry->second, LoadImage(*renderer, entry->first));
+							}
+						} else if (kind == AssetKind::Model) {
+							if (auto* entry = Find(cache.first->models, file)) {
+								held = true;
+								if (FileManager::FileExists(entry->first.c_str()))
+									reload->models.emplace_back(
+									  entry->second, LoadModel(*renderer, entry->first));
+							}
+						} else if (auto* entry = Find(cache.first->sounds, file)) {
+							held = true;
+							if (FileManager::FileExists(entry->first.c_str()))
+								reload->sounds.emplace_back(entry->second,
+								                            LoadSound(*audio, entry->first));
+						}
+					}
+
+					// Held nowhere: only check it loads. A file gone from every pak
+					// is skipped, and its holders keep what they have.
+					if (!held) {
+						LoadScope scope(nullptr);
+						if (FileManager::FileExists(file.c_str()))
+							CheckFile(file);
 					}
 				} catch (const std::exception& ex) {
 					errors.push_back({path, ex.what()});
@@ -366,16 +407,50 @@ namespace spades {
 			generation++;
 		}
 
-		void GameResources::ReloadGraphics() { ReloadAll(GetImageAndModelFiles()); }
+		void GameResources::CheckFile(const std::string& path) {
+			SPADES_MARK_FUNCTION();
 
-		void GameResources::ReloadSounds() { ReloadAll(GetSoundFiles()); }
+			switch (ResourceChanges::GetAssetKind(path)) {
+				case AssetKind::Image: Bitmap::Load(path); break;
+				case AssetKind::Model: VoxelModelLoader::Load(path.c_str()); break;
+				case AssetKind::ModelMetadata: {
+					std::string model = path.substr(0, path.size() - 10) + ".kv6";
+					if (FileManager::FileExists(model.c_str()))
+						VoxelModelLoader::Load(model.c_str());
+					break;
+				}
+				case AssetKind::Sound: {
+					// The header is enough to tell a sound from garbage.
+					std::unique_ptr<IAudioStream> stream(OpenAudioStream(path));
+					break;
+				}
+				default: break;
+			}
+		}
 
-		void GameResources::ReloadAll(const std::vector<std::string>& files) {
+		void GameResources::ReloadGraphics() { ReloadAll(true, false); }
+
+		void GameResources::ReloadSounds() { ReloadAll(false, true); }
+
+		void GameResources::ReloadAll(bool graphics, bool sounds) {
 			SPADES_MARK_FUNCTION();
 
 			ResourceChanges changes;
-			for (const std::string& file : files)
-				changes.Add(file);
+			auto add = [&](const Cache& cache) {
+				if (graphics) {
+					for (const auto& entry : cache.images)
+						changes.Add(entry.first);
+					for (const auto& entry : cache.models)
+						changes.Add(entry.first);
+				}
+				if (sounds) {
+					for (const auto& entry : cache.sounds)
+						changes.Add(entry.first);
+				}
+			};
+			add(shared);
+			for (const auto& entry : skinned)
+				add(entry.second.second);
 			std::vector<ResourceLoadError> errors;
 			auto reload = PrepareReload(changes, errors);
 			for (const ResourceLoadError& error : errors)

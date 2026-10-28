@@ -182,7 +182,10 @@ namespace spades {
 			ScriptObjectRegistrar::RegisterAll(this, ScriptObjectRegistrar::PhaseGlobalFunction);
 			ScriptObjectRegistrar::RegisterAll(this, ScriptObjectRegistrar::PhaseObjectMember);
 
-			BuildModule("Client");
+			std::string file;
+			std::string error = TryBuildModule("Client", file);
+			if (!error.empty())
+				throw ScriptBuildError(error, file);
 		} catch (...) {
 			engine->Release();
 			throw;
@@ -209,34 +212,40 @@ namespace spades {
 			SPRaise("Failed to build at least one of the scripts.");
 	}
 
-	static constexpr const char* kNextModule = "ClientNext";
-
-	std::string ScriptManager::PrepareReload(std::string& errorFile) {
+	std::string ScriptManager::TryBuildModule(const char* name, std::string& errorFile) {
 		SPADES_MARK_FUNCTION();
-
-		DiscardReload();
-		errorFile.clear();
 
 		BuildError error;
 		engine->SetMessageCallback(asFUNCTION(MessageCallback), &error, asCALL_CDECL);
 		try {
-			BuildModule(kNextModule);
+			BuildModule(name);
 		} catch (const std::exception& ex) {
 			if (error.message.empty())
 				error.message = ex.what();
 		}
 		engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 
-		// The game calls into the module by these; the new one must have them all.
+		// The game calls into the module by these; it must have them all.
 		if (error.message.empty())
-			error.message = ScriptFunction::FindMissing(engine, engine->GetModule(kNextModule));
+			error.message = ScriptFunction::FindMissing(engine, engine->GetModule(name));
 
+		errorFile.clear();
 		if (!error.message.empty()) {
-			DiscardReload();
+			if (engine->GetModule(name))
+				engine->DiscardModule(name);
 			if (!error.section.empty())
 				errorFile = "Scripts" + error.section;
 		}
 		return error.message;
+	}
+
+	static constexpr const char* kNextModule = "ClientNext";
+
+	std::string ScriptManager::PrepareReload(std::string& errorFile) {
+		SPADES_MARK_FUNCTION();
+
+		DiscardReload();
+		return TryBuildModule(kNextModule, errorFile);
 	}
 
 	void ScriptManager::CommitReload() {
@@ -252,6 +261,23 @@ namespace spades {
 		next->SetName("Client");
 		generation++;
 		SPLog("Scripts reloaded");
+	}
+
+	std::string ScriptManager::ReplaceModule(const std::string& name, std::string& errorFile) {
+		SPADES_MARK_FUNCTION();
+
+		std::string next = name + "#next";
+		std::string error = TryBuildModule(next.c_str(), errorFile);
+		if (!error.empty())
+			return error;
+		DiscardModule(name);
+		engine->GetModule(next.c_str())->SetName(name.c_str());
+		return error;
+	}
+
+	void ScriptManager::DiscardModule(const std::string& name) {
+		if (engine->GetModule(name.c_str()))
+			engine->DiscardModule(name.c_str());
 	}
 
 	void ScriptManager::DiscardReload() {

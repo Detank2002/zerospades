@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <utility>
@@ -65,15 +66,15 @@ namespace spades {
 			                            std::vector<ModFailure>& failures) {
 				PakOverlay::PakSet paks;
 				std::map<std::string, std::string> broken; // mod -> why
-				for (const auto& entry : ModsScreenHelper::GetModPaks(mods)) {
-					if (broken.count(entry.first))
+				for (const auto& pak : ModsScreenHelper::GetModPaks(mods)) {
+					if (broken.count(pak.mod))
 						continue;
 					try {
-						paks.push_back(PakOverlay::Load(entry.second, entry.first));
-						SPLog("Mod pak loaded (in memory): %s", entry.second.c_str());
+						paks.push_back(PakOverlay::Load(pak.path, pak.mod, pak.stamp));
+						SPLog("Mod pak loaded (in memory): %s", pak.path.c_str());
 					} catch (const std::exception& ex) {
-						SPLog("Mod pak failed to load: %s: %s", entry.second.c_str(), ex.what());
-						broken[entry.first] = entry.second + ": " + ex.what();
+						SPLog("Mod pak failed to load: %s: %s", pak.path.c_str(), ex.what());
+						broken[pak.mod] = pak.path + ": " + ex.what();
 					}
 				}
 				for (const auto& mod : broken) {
@@ -99,7 +100,37 @@ namespace spades {
 			Handle<ModsScreenHelper> helper = Handle<ModsScreenHelper>::New();
 			std::vector<std::string> mods = helper->GetEnabledMods();
 			std::vector<ModFailure> failures;
-			PakOverlay::SetLayer(Layer::Mods, LoadPaks(mods, failures));
+			PakOverlay::PakSet paks = LoadPaks(mods, failures);
+			PakOverlay::SetLayer(Layer::Mods, paks);
+
+			// Decode every game asset the mods bring once, so a broken one disables
+			// its mod now rather than failing in a game.
+			std::map<std::string, std::string> broken; // mod -> why
+			std::set<std::string> checked;
+			for (const auto& pak : paks) {
+				for (const std::string& file : pak->GetFiles()) {
+					if (!ResourceChanges::IsGameAsset(file) ||
+					    !checked.insert(ResourceChanges::Normalize(file)).second)
+						continue;
+					try {
+						client::GameResources::CheckFile(file);
+					} catch (const std::exception& ex) {
+						std::string mod = PakOverlay::GetOwner(file);
+						SPLog("Mod failed to load: %s: %s: %s", mod.c_str(), file.c_str(),
+						      ex.what());
+						broken.emplace(mod, file + ": " + ex.what());
+					}
+				}
+			}
+			if (!broken.empty()) {
+				for (const auto& mod : broken) {
+					Remove(paks, mod.first);
+					Remove(mods, mod.first);
+					failures.push_back({mod.first, mod.second});
+				}
+				PakOverlay::SetLayer(Layer::Mods, paks);
+			}
+
 			g_mountedMods = mods;
 			if (!failures.empty()) {
 				helper->SetEnabledMods(mods);
@@ -115,9 +146,12 @@ namespace spades {
 				try {
 					ScriptManager::GetInstance();
 					return;
-				} catch (const std::exception& ex) {
+				} catch (const ScriptBuildError& ex) {
+					// The mod the failing script comes from, or else the last enabled
+					// mod with scripts.
 					PakOverlay::PakSet paks = PakOverlay::GetLayer(Layer::Mods);
-					std::string culprit;
+					std::string culprit =
+					  ex.GetFile().empty() ? std::string() : PakOverlay::GetOwner(ex.GetFile());
 					for (auto it = paks.rbegin(); it != paks.rend() && culprit.empty(); ++it) {
 						for (const std::string& file : (*it)->GetFiles()) {
 							if (ResourceChanges::GetAssetKind(file) ==
@@ -130,12 +164,13 @@ namespace spades {
 					if (culprit.empty())
 						throw;
 
-					SPLog("Mod failed to load: %s: %s", culprit.c_str(), ex.what());
+					std::string reason = ex.what(); // names the script, if there is one
+					SPLog("Mod failed to load: %s: %s", culprit.c_str(), reason.c_str());
 					Remove(paks, culprit);
 					PakOverlay::SetLayer(Layer::Mods, std::move(paks));
 					Remove(g_mountedMods, culprit);
 					Handle<ModsScreenHelper>::New()->SetEnabledMods(g_mountedMods);
-					g_startupFailures.push_back({culprit, ex.what()});
+					g_startupFailures.push_back({culprit, reason});
 				}
 			}
 		}
@@ -179,10 +214,11 @@ namespace spades {
 
 			// Each round leaves out at least one mod, so this ends.
 			while (true) {
-				ResourceChanges changes = PakOverlay::SetLayer(Layer::Mods, paks);
+				PakOverlay::Changes changes = PakOverlay::SetLayer(Layer::Mods, paks);
 
 				std::vector<ResourceLoadError> errors;
-				auto reload = stmp::make_unique<client::GameAssetReload>(*game, changes, errors);
+				auto reload =
+				  stmp::make_unique<client::GameAssetReload>(*game, changes.game, errors);
 				if (!errors.empty()) {
 					// Blame the mods the failing files come from, while they are mounted.
 					std::map<std::string, std::string> culprits;
@@ -217,7 +253,7 @@ namespace spades {
 
 				// What the software loaded itself was built from the previous set, so
 				// keep that mounted until the restart; the enabled set is the new one.
-				if (!client::GameAssetReload::GetSoftwareChanges(changes, renderer, audio)
+				if (!client::GameAssetReload::GetSoftwareChanges(changes.software, renderer, audio)
 				       .empty()) {
 					reload.reset();
 					PakOverlay::SetLayer(Layer::Mods, mounted);

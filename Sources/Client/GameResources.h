@@ -30,6 +30,7 @@
 #include "IAudioChunk.h"
 #include "IImage.h"
 #include "IModel.h"
+#include "Skin.h"
 #include <Core/RefCountedObject.h>
 #include <Core/ResourceChanges.h>
 
@@ -63,14 +64,26 @@ namespace spades {
 
 			GameResources(Handle<IRenderer> renderer, Handle<IAudioDevice> audio);
 
-			Handle<IImage> RegisterImage(const std::string& path);
-			Handle<IModel> RegisterModel(const std::string& path);
-			Handle<IAudioChunk> RegisterSound(const std::string& path);
+			/**
+			 * Loads `path` once and shares it. With a `skin` that has its own `path`,
+			 * the skin's is loaded, once, and shared by that skin's players.
+			 */
+			Handle<IImage> RegisterImage(const std::string& path, Skin* skin = nullptr);
+			Handle<IModel> RegisterModel(const std::string& path, Skin* skin = nullptr);
+			Handle<IAudioChunk> RegisterSound(const std::string& path, Skin* skin = nullptr);
 
-			/** A renderer that draws with the base one and loads through this set. */
-			Handle<IRenderer> CreateRenderer();
-			/** An audio device that plays with the base one and loads through this set. */
-			Handle<IAudioDevice> CreateAudioDevice();
+			/**
+			 * A renderer that draws with the base one and loads through this set,
+			 * seeing `skin` on top if there is one.
+			 */
+			Handle<IRenderer> CreateRenderer(Handle<Skin> skin = {});
+			/**
+			 * An audio device that plays with the base one and loads through this
+			 * set, seeing `skin` on top if there is one.
+			 */
+			Handle<IAudioDevice> CreateAudioDevice(Handle<Skin> skin = {});
+			/** Drops what was loaded from the skin `name`; its holders keep it. */
+			void ForgetSkin(const std::string& name);
 
 			std::vector<std::string> GetImageAndModelFiles() const;
 			std::vector<std::string> GetSoundFiles() const;
@@ -90,6 +103,12 @@ namespace spades {
 			void ReloadGraphics();
 			void ReloadSounds();
 
+			/**
+			 * Decodes the game asset at `path` without making anything of it, and
+			 * raises if it doesn't load. Needs no renderer or audio device.
+			 */
+			static void CheckFile(const std::string& path);
+
 			/** Changes with each `CommitReload`. */
 			std::uint64_t GetGeneration() const { return generation; }
 
@@ -97,14 +116,22 @@ namespace spades {
 			~GameResources();
 
 		private:
+			struct Cache {
+				std::map<std::string, Handle<IImage>> images;
+				std::map<std::string, Handle<IModel>> models;
+				std::map<std::string, Handle<IAudioChunk>> sounds;
+			};
+
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audio;
-			std::map<std::string, Handle<IImage>> images;
-			std::map<std::string, Handle<IModel>> models;
-			std::map<std::string, Handle<IAudioChunk>> sounds;
+			Cache shared;
+			// The files skins have their own of, by skin name.
+			std::map<std::string, std::pair<Handle<Skin>, Cache>> skinned;
 			std::uint64_t generation = 0;
 
-			void ReloadAll(const std::vector<std::string>& files);
+			/** Where `path`, loaded for `skin`, is held. */
+			Cache& GetCache(Skin* skin, const std::string& path);
+			void ReloadAll(bool graphics, bool sounds);
 		};
 	} // namespace client
 } // namespace spades

@@ -213,7 +213,9 @@ namespace spades {
 		void Client::UpdateWorld(float dt, float gameplayDt) {
 			SPADES_MARK_FUNCTION();
 
-			// Mods changed the skin scripts: build the players' skins again.
+			// Mods changed the skin scripts, or a player's skin changed: build the
+			// players' skins again.
+			UpdateSkinScripts();
 			for (const auto& clientPlayer : clientPlayers) {
 				if (clientPlayer && !clientPlayer->HasCurrentSkins())
 					clientPlayer->RebuildSkins();
@@ -1420,7 +1422,8 @@ namespace spades {
 
 			// create ragdoll corpse
 			if (cg_ragdoll) {
-				auto corp = stmp::make_unique<Corpse>(*renderer, *map, victim, isChristmasOn);
+				auto corp = stmp::make_unique<Corpse>(GetPlayerRenderer(victim.GetId()), *map, victim,
+				                                     isChristmasOn);
 
 				if (kt == KillTypeGrenade) {
 					corp->AddImpulse(MakeVector3(0, 0, -4.0F - SampleRandomFloat() * 4.0F));

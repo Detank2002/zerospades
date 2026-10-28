@@ -42,6 +42,8 @@ namespace spades {
 		void operator=(const ScriptFunction&) = delete;
 
 		ScriptContextHandle Prepare();
+		/** `Prepare`, with the function from the module `module` rather than "Client". */
+		ScriptContextHandle Prepare(const std::string& module);
 
 		/** Why `module` lacks a function some ScriptFunction looks up, or "". */
 		static std::string FindMissing(asIScriptEngine*, asIScriptModule* module);

@@ -23,12 +23,12 @@
 #include <string>
 #include <vector>
 
+#include "IAudioChunk.h"
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
 	namespace client {
-		class IAudioChunk;
 		class GameMap;
 
 		struct AudioParam {
@@ -47,7 +47,8 @@ namespace spades {
 		public:
 			virtual ~IAudioDevice() {}
 
-			virtual IAudioChunk* RegisterSound(const char* name) = 0;
+			/** Loads `name` once; later calls share the chunk. */
+			virtual Handle<IAudioChunk> RegisterSound(const char* name) = 0;
 
 			/**
 			 * Clear the cache of chunks loaded via `RegisterSound`. This method

@@ -29,10 +29,15 @@ namespace spades {
 
 	namespace {
 		// Every ScriptFunction, so a new module can be checked against them all.
-		std::mutex g_functionsMutex;
+		// Never destroyed: static ScriptFunctions in other files may outlive any
+		// static here.
+		std::mutex& GetFunctionsMutex() {
+			static auto* mutex = new std::mutex();
+			return *mutex;
+		}
 		std::set<ScriptFunction*>& GetFunctions() {
-			static std::set<ScriptFunction*> functions;
-			return functions;
+			static auto* functions = new std::set<ScriptFunction*>();
+			return *functions;
 		}
 	} // namespace
 
@@ -78,7 +83,7 @@ namespace spades {
 	}
 
 	std::string ScriptFunction::FindMissing(asIScriptEngine* eng, asIScriptModule* module) {
-		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		std::lock_guard<std::mutex> lock(GetFunctionsMutex());
 		for (ScriptFunction* function : GetFunctions()) {
 			std::string error;
 			if (!function->Find(eng, module, error))
@@ -89,18 +94,18 @@ namespace spades {
 
 	ScriptFunction::ScriptFunction(const std::string& decl)
 	    : decl(decl), type(), loadedGeneration(0), func(NULL) {
-		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		std::lock_guard<std::mutex> lock(GetFunctionsMutex());
 		GetFunctions().insert(this);
 	}
 
 	ScriptFunction::ScriptFunction(const std::string& type, const std::string& decl)
 	    : decl(decl), type(type), loadedGeneration(0), func(NULL) {
-		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		std::lock_guard<std::mutex> lock(GetFunctionsMutex());
 		GetFunctions().insert(this);
 	}
 
 	ScriptFunction::~ScriptFunction() {
-		std::lock_guard<std::mutex> lock(g_functionsMutex);
+		std::lock_guard<std::mutex> lock(GetFunctionsMutex());
 		GetFunctions().erase(this);
 	}
 
@@ -109,6 +114,24 @@ namespace spades {
 		Load(ctx.GetContext()->GetEngine());
 
 		ctx->Prepare(func);
+		return ctx;
+	}
+
+	ScriptContextHandle ScriptFunction::Prepare(const std::string& module) {
+		if (module == "Client")
+			return Prepare();
+
+		// Skin modules come and go: look the function up each time.
+		ScriptContextHandle ctx = ScriptManager::GetInstance()->GetContext();
+		asIScriptEngine* eng = ctx.GetContext()->GetEngine();
+		asIScriptModule* mod = eng->GetModule(module.c_str());
+		if (!mod)
+			SPRaise("Script module '%s' not found.", module.c_str());
+		std::string error;
+		asIScriptFunction* f = Find(eng, mod, error);
+		if (!f)
+			SPRaise("%s", error.c_str());
+		ctx->Prepare(f);
 		return ctx;
 	}
 

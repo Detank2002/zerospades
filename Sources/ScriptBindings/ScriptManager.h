@@ -38,10 +38,24 @@
 #include <cstdint>
 #include <list>
 #include <mutex>
+#include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace spades {
 
 	class ScriptContextHandle;
+
+	/** The scripts don't build. */
+	class ScriptBuildError : public std::runtime_error {
+		std::string file;
+
+	public:
+		ScriptBuildError(const std::string& message, std::string file)
+		    : std::runtime_error(message), file(std::move(file)) {}
+		/** The script at fault, as "Scripts/Skin/Foo.as", or "" if none is. */
+		const std::string& GetFile() const { return file; }
+	};
 
 	class ScriptManager {
 		friend class ScriptContextHandle;
@@ -60,6 +74,11 @@ namespace spades {
 
 		/** Builds `Scripts/Main.as`, and what it includes, into a new module. */
 		void BuildModule(const char* name);
+		/**
+		 * `BuildModule`, then checks the module has every function the game looks
+		 * up. Returns the first error, or ""; a module with an error is dropped.
+		 */
+		std::string TryBuildModule(const char* name, std::string& errorFile);
 
 	public:
 		static ScriptManager* GetInstance();
@@ -80,6 +99,13 @@ namespace spades {
 		void CommitReload();
 		/** Drops the prepared module, if there is one. */
 		void DiscardReload();
+
+		/**
+		 * Builds the scripts as mounted now into the module `name`, for a skin.
+		 * Returns the first error, or ""; on an error the module stays as it was.
+		 */
+		std::string ReplaceModule(const std::string& name, std::string& errorFile);
+		void DiscardModule(const std::string& name);
 
 		/** Changes each time `CommitReload` replaces the module. */
 		std::uint64_t GetGeneration() const { return generation; }

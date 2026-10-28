@@ -32,14 +32,17 @@ namespace spades {
 	class ZipFileSystem;
 
 	/**
-	 * Paks mounted over the base paks, in layers: the enabled mods, then on top
-	 * the mods a game loaded for itself, such as skins and weapon mods. Within a
-	 * layer, the last pak is on top.
+	 * Mod paks mounted over the base paks, in two layers:
 	 *
-	 * Each pak is read into memory once, so the file on disk is never held open
-	 * and can be overwritten or deleted while the game runs. A pak taken out of a
-	 * layer stays in memory for as long as someone holds it, so a change can be
-	 * undone by putting the previous paks back.
+	 * - Mods: the enabled mods, seen by everything.
+	 * - Game: the mods a game loaded for itself, such as skins and weapon mods.
+	 *   They sit on top of the enabled mods, and only the game's own reads see
+	 *   them (FileManager::GameScope), so the software never picks them up.
+	 *
+	 * Within a layer, the last pak is on top. Each pak is read into memory, so
+	 * the file on disk is never held open and can be replaced while the game
+	 * runs. A pak taken out of a layer stays in memory for as long as someone
+	 * holds it, so a change is undone by setting the previous paks again.
 	 */
 	class PakOverlay {
 	public:
@@ -49,6 +52,8 @@ namespace spades {
 		class Pak {
 			friend class PakOverlay;
 			std::string owner; // the mod it belongs to
+			std::string path;
+			std::string stamp; // what the file on disk looked like when read, or ""
 			std::string id;    // path and checksum: equal ids, equal files
 			std::unique_ptr<IStream> stream;        // outlives the file system
 			std::unique_ptr<IFileSystem> unmounted; // owns `fs` while not mounted
@@ -60,22 +65,40 @@ namespace spades {
 			const std::string& GetOwner() const { return owner; }
 			const std::string& GetId() const { return id; }
 			std::vector<std::string> GetFiles() const;
+			/** Its file system; mounted or not, valid while the pak lives. */
+			IFileSystem* GetFileSystem() const;
 		};
 		using PakSet = std::vector<std::shared_ptr<Pak>>;
 
-		/** Reads the pak at `path`, a resource path, for `owner`. Raises if it can't. */
-		static std::shared_ptr<Pak> Load(const std::string& path, const std::string& owner);
+		/** The files a layer change made read from another pak, or from none. */
+		struct Changes {
+			ResourceChanges game;     // as the game sees them: both layers
+			ResourceChanges software; // as the software sees them: the enabled mods
+		};
+
+		/**
+		 * The paks of the mod named `name`, a pak in Mods/ or a folder of paks
+		 * there, in mount order. Empty if there is no such mod.
+		 */
+		static std::vector<std::string> FindModPaks(const std::string& name);
+
+		/**
+		 * Reads the pak at `path`, a resource path, for the mod `owner`. Raises if it
+		 * can't. With a `stamp`, such as the file's size and time, a pak already
+		 * read from `path` with the same stamp is shared instead of read again.
+		 */
+		static std::shared_ptr<Pak> Load(const std::string& path, const std::string& owner,
+		                                 const std::string& stamp = {});
 
 		static const PakSet& GetLayer(Layer);
 
 		/**
-		 * Mounts `paks` as `layer`, in place of the paks it held, and returns the
-		 * files that are now read from another pak, or from none. To undo it, set
-		 * the previous paks again.
+		 * Mounts `paks` as `layer`, in place of the paks it held, and returns what
+		 * that changed. To undo it, set the previous paks again.
 		 */
-		static ResourceChanges SetLayer(Layer, PakSet paks);
+		static Changes SetLayer(Layer, PakSet paks);
 
-		/** The owner of the overlay pak `path` is read from, or "" if none is. */
+		/** The owner of the pak the game reads `path` from, or "" if no mod has it. */
 		static std::string GetOwner(const std::string& path);
 	};
 } // namespace spades

@@ -195,7 +195,7 @@ namespace spades {
 				  {CMD_CLEARGFXCACHE,
 				   _Tr("Client", "Clear the GFX (models and images) cache, forcing reload")},
 				  {CMD_CLEARSFXCACHE, _Tr("Client", "Clear the SFX cache, forcing reload")},
-				  {CMD_MODSAPPLY, _Tr("Client", "Apply the enabled mods without a restart")},
+				  {CMD_MODSAPPLY, _Tr("Client", "Apply the enabled mods, during a game too")},
 				};
 				return commands;
 			}

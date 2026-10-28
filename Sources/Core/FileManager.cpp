@@ -29,6 +29,31 @@
 
 namespace spades {
 	static std::list<IFileSystem*> g_fileSystems;
+	// Seen, on top of the others, only by reads in a GameScope.
+	static std::list<IFileSystem*> g_gameFileSystems;
+	static thread_local int g_gameScopeDepth = 0;
+	// What the Overlays alive on this thread put on top, the latest last.
+	static thread_local std::vector<std::vector<IFileSystem*>> g_overlays;
+
+	// The file systems a read on this thread sees, the topmost first.
+	static std::vector<IFileSystem*> GetReadable() {
+		std::vector<IFileSystem*> list;
+		for (auto it = g_overlays.rbegin(); it != g_overlays.rend(); ++it)
+			list.insert(list.end(), it->begin(), it->end());
+		if (g_gameScopeDepth > 0)
+			list.insert(list.end(), g_gameFileSystems.begin(), g_gameFileSystems.end());
+		list.insert(list.end(), g_fileSystems.begin(), g_fileSystems.end());
+		return list;
+	}
+
+	FileManager::GameScope::GameScope() { g_gameScopeDepth++; }
+	FileManager::GameScope::~GameScope() { g_gameScopeDepth--; }
+
+	FileManager::Overlay::Overlay(std::vector<IFileSystem*> fileSystems) {
+		g_overlays.push_back(std::move(fileSystems));
+	}
+	FileManager::Overlay::~Overlay() { g_overlays.pop_back(); }
+
 	std::unique_ptr<IStream> FileManager::OpenForReading(const char* fn) {
 		SPADES_MARK_FUNCTION();
 		if (!fn)
@@ -37,14 +62,15 @@ namespace spades {
 			SPFileNotFound(fn);
 
 		// check each file system
-		for (auto* fs : g_fileSystems) {
+		std::vector<IFileSystem*> readable = GetReadable();
+		for (auto* fs : readable) {
 			if (fs->FileExists(fn))
 				return fs->OpenForReading(fn);
 		}
 
 		// check weak files, too
 		auto weak_fn = std::string(fn) + ".weak";
-		for (auto* fs : g_fileSystems) {
+		for (auto* fs : readable) {
 			if (fs->FileExists(weak_fn.c_str()))
 				return fs->OpenForReading(weak_fn.c_str());
 		}
@@ -78,14 +104,15 @@ namespace spades {
 		if (!fn)
 			SPInvalidArgument("fn");
 
-		for (auto* fs : g_fileSystems) {
+		std::vector<IFileSystem*> readable = GetReadable();
+		for (auto* fs : readable) {
 			if (fs->FileExists(fn))
 				return true;
 		}
 
 		// check weak files, too
 		auto weak_fn = std::string(fn) + ".weak";
-		for (auto* fs : g_fileSystems) {
+		for (auto* fs : readable) {
 			if (fs->FileExists(weak_fn.c_str()))
 				return true;
 		}
@@ -133,14 +160,23 @@ namespace spades {
 		g_fileSystems.push_front(fs);
 	}
 
+	void FileManager::PrependGameFileSystem(spades::IFileSystem* fs) {
+		SPADES_MARK_FUNCTION();
+		if (!fs)
+			SPInvalidArgument("fs");
+		g_gameFileSystems.push_front(fs);
+	}
+
 	std::unique_ptr<IFileSystem> FileManager::RemoveFileSystem(spades::IFileSystem* fs) {
 		SPADES_MARK_FUNCTION();
 		if (!fs)
 			SPInvalidArgument("fs");
-		for (auto it = g_fileSystems.begin(); it != g_fileSystems.end(); ++it) {
-			if (*it == fs) {
-				g_fileSystems.erase(it);
-				return std::unique_ptr<IFileSystem>(fs);
+		for (auto* list : {&g_gameFileSystems, &g_fileSystems}) {
+			for (auto it = list->begin(); it != list->end(); ++it) {
+				if (*it == fs) {
+					list->erase(it);
+					return std::unique_ptr<IFileSystem>(fs);
+				}
 			}
 		}
 		return nullptr;
@@ -162,7 +198,7 @@ namespace spades {
 		if (!path)
 			SPInvalidArgument("path");
 
-		for (auto* fs : g_fileSystems) {
+		for (auto* fs : GetReadable()) {
 			std::vector<std::string> l = fs->EnumFiles(path);
 			for (size_t i = 0; i < l.size(); i++)
 				set.insert(l[i]);
@@ -175,6 +211,9 @@ namespace spades {
 	}
 
 	void FileManager::Close() {
+		for (auto* fs : g_gameFileSystems)
+			delete fs;
+		g_gameFileSystems.clear();
 		for (auto* fs : g_fileSystems)
 			delete fs;
 		g_fileSystems.clear();
